@@ -7,7 +7,7 @@
       "name": "Debug Server",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/server/index.ts",
-      "runtimeArgs": ["-r", "ts-node/register"],
+      "runtimeArgs": ["-r", "ts-node/register", "--project", "tsconfig.server.json"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "env": {
         "SERVER_PORT": "4000",

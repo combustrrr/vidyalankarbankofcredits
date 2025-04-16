@@ -4,7 +4,7 @@ import bodyParser from 'body-parser';
 import { Course, ApiResponse } from '../types';
 
 const app = express();
-const port = process.env.SERVER_PORT || 4000; // Use SERVER_PORT to avoid confusion with Next.js PORT
+const port = process.env.SERVER_PORT || 4000; // Use SERVER_PORT to avoid conflicts
 
 // Middleware
 app.use(cors({
@@ -18,7 +18,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // In-memory database (in a production app, use a real database)
 const courses: Course[] = [];
 
-// Routes - simplify by removing the /api prefix (will be added by the proxy)
+// Routes - removing /api prefix since Next.js will add it
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
