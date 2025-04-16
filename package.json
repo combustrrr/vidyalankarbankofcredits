@@ -1,0 +1,26 @@
+{
+  "name": "vidyalankarbankofcredits",
+  "version": "1.0.0",
+  "description": "A full-stack web application scaffolded using Next.js, Tailwind CSS, and Node.js + Express backend with TypeScript.",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest"
+  }
+}
