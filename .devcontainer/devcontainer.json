@@ -2,5 +2,6 @@
   "tasks": {
     "build": "npm run build",
     "test": "cat package.json"
-  }
+  },
+  "postCreateCommand": "npm install && npm run dev"
 }
