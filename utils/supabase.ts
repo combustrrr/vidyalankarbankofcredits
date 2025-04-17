@@ -1,10 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * Client-side Supabase utility
+ * 
+ * Provides a structured interface for interacting with Supabase
+ * from the client-side with caching and error handling
+ */
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
+import { supabaseConfig } from '../config';
+import { Course, CourseFilterOptions, PaginationOptions } from '../types';
 
-// These environment variables will be securely added via .env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Get Supabase URL and Key from centralized config
+const supabaseUrl = supabaseConfig.url || '';
+const supabaseAnonKey = supabaseConfig.anonKey || '';
 
+// Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Please check your .env.local file.');
 }
@@ -14,12 +23,6 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true, // Maintain session to reduce auth requests
   },
-  global: {
-    fetch: (...args) => {
-      // Add exponential backoff retry logic for the free tier's rate limiting
-      return fetch(...args);
-    },
-  },
 });
 
 // Cache for program structures to reduce database calls on free tier
@@ -27,205 +30,269 @@ let programStructureCache: Record<string, any> = {};
 let programStructureCacheLastUpdated = 0;
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
-// Courses table type with Supabase
-export type CourseInsert = {
-  course_code: string;
-  title: string;
-  type: 'Theory' | 'Practical';
-  credits: number;
-  semester: number;
-  degree: string;
-  branch: string;
-  vertical: string;
-  basket: string;
-  structure_id?: string | null;
+// Helper function to handle Supabase errors consistently
+const handleSupabaseError = (error: any, customMessage: string): never => {
+  console.error(`${customMessage}:`, error);
+  throw new Error(`${customMessage}: ${error.message || 'Unknown error'}`);
 };
 
-// Program structure type
-export type ProgramStructure = Database['public']['Tables']['program_structure']['Row'];
-
-// Supabase course API functions
-export const supabaseCourseApi = {
-  // Create a new course in Supabase
-  create: async (courseData: CourseInsert) => {
-    // First check if there is a matching program structure
-    const { data: structureData, error: structureError } = await supabase
-      .from('program_structure')
-      .select('id')
-      .eq('vertical', courseData.vertical)
-      .eq('semester', courseData.semester)
-      .single();
-
-    if (structureError && structureError.code !== 'PGRST116') {
-      console.warn('Error fetching program structure:', structureError);
-      // Continue without structure_id if not found
-    }
-
-    // If a matching structure was found, include its ID
-    if (structureData) {
-      courseData.structure_id = structureData.id;
-    }
-
-    const { data, error } = await supabase
-      .from('courses')
-      .insert([courseData])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  // Get all courses from Supabase with pagination for free tier
-  getAll: async (page = 0, pageSize = 20) => {
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    
-    const { data, error, count } = await supabase
-      .from('courses')
-      .select('*, program_structure(*)', { count: 'exact' })
-      .range(from, to)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return { 
-      data: data || [], 
-      totalCount: count || 0,
-      currentPage: page,
-      pageSize
-    };
-  },
-
-  // Get a single course by ID from Supabase
-  getById: async (id: string) => {
-    const { data, error } = await supabase
-      .from('courses')
-      .select('*, program_structure(*)')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  // Update a course in Supabase
-  update: async (id: string, courseData: Partial<CourseInsert>) => {
-    // If vertical or semester changed, fetch the matching program structure
-    if (courseData.vertical !== undefined || courseData.semester !== undefined) {
-      const { data: course, error: courseError } = await supabase
+// Supabase course API functions with better error handling
+export const courseApi = {
+  // Get all courses with pagination and filtering
+  getAll: async (
+    options: PaginationOptions & CourseFilterOptions = {}
+  ) => {
+    try {
+      const { page = 0, pageSize = 20, sortBy = 'created_at', sortOrder = 'desc', ...filters } = options;
+      
+      // Calculate range for pagination
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      
+      // Start query builder
+      let query = supabase
         .from('courses')
-        .select('vertical, semester')
+        .select('*, program_structure(*)', { count: 'exact' });
+      
+      // Apply filters
+      if (filters.semester) query = query.eq('semester', filters.semester);
+      if (filters.vertical) query = query.eq('vertical', filters.vertical);
+      if (filters.basket) query = query.eq('basket', filters.basket);
+      if (filters.type) query = query.eq('type', filters.type);
+      if (filters.degree) query = query.eq('degree', filters.degree);
+      if (filters.branch) query = query.eq('branch', filters.branch);
+      
+      // Apply sorting and pagination
+      const { data, error, count } = await query
+        .order(sortBy, { ascending: sortOrder === 'asc' })
+        .range(from, to);
+      
+      if (error) {
+        throw new Error(`Failed to fetch courses: ${error.message}`);
+      }
+      
+      return {
+        data: data || [],
+        totalCount: count || 0,
+        page,
+        pageSize,
+        totalPages: Math.ceil((count || 0) / pageSize),
+        hasNextPage: to < (count || 0) - 1,
+        hasPreviousPage: from > 0
+      };
+    } catch (error: any) {
+      console.error('Error fetching courses:', error);
+      throw new Error(`Unexpected error fetching courses: ${error.message}`);
+    }
+  },
+
+  // Get a course by ID
+  getById: async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*, program_structure(*)')
         .eq('id', id)
         .single();
       
-      if (courseError) throw courseError;
+      if (error) {
+        throw new Error(`Failed to fetch course with ID ${id}: ${error.message}`);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error(`Error fetching course with ID ${id}:`, error);
+      throw new Error(`Unexpected error fetching course with ID ${id}: ${error.message}`);
+    }
+  },
 
-      const vertical = courseData.vertical || course.vertical;
-      const semester = courseData.semester || course.semester;
-
+  // Create a new course
+  create: async (courseData: Omit<Course, 'id' | 'created_at'>) => {
+    try {
+      // Check if there's a matching program structure
       const { data: structureData, error: structureError } = await supabase
         .from('program_structure')
         .select('id')
-        .eq('vertical', vertical)
-        .eq('semester', semester)
+        .eq('vertical', courseData.vertical)
+        .eq('semester', courseData.semester)
+        .maybeSingle();
+      
+      // Set structure_id if found
+      let structure_id = null;
+      if (structureData && !structureError) {
+        structure_id = structureData.id;
+      }
+      
+      // Insert course with structure ID
+      const { data, error } = await supabase
+        .from('courses')
+        .insert([{ ...courseData, structure_id }])
+        .select()
         .single();
-
-      if (structureError && structureError.code !== 'PGRST116') {
-        console.warn('Error fetching program structure:', structureError);
+      
+      if (error) {
+        throw new Error(`Failed to create course: ${error.message}`);
       }
-
-      if (structureData) {
-        courseData.structure_id = structureData.id;
-      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('Error creating course:', error);
+      throw new Error(`Unexpected error creating course: ${error.message}`);
     }
-
-    const { data, error } = await supabase
-      .from('courses')
-      .update(courseData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
   },
 
-  // Delete a course from Supabase
-  delete: async (id: string) => {
-    const { error } = await supabase
-      .from('courses')
-      .delete()
-      .eq('id', id);
+  // Update an existing course
+  update: async (id: string, courseData: Partial<Course>) => {
+    try {
+      // If updating vertical or semester, fetch matching program structure
+      let updateData = { ...courseData };
+      
+      if (courseData.vertical !== undefined || courseData.semester !== undefined) {
+        // Get current course data
+        const { data: currentCourse, error: fetchError } = await supabase
+          .from('courses')
+          .select('vertical, semester')
+          .eq('id', id)
+          .single();
+        
+        if (fetchError) {
+          throw new Error(`Failed to fetch current course data for ID ${id}: ${fetchError.message}`);
+        }
+        
+        // Use provided values or fallback to current values
+        const vertical = courseData.vertical || currentCourse.vertical;
+        const semester = courseData.semester || currentCourse.semester;
+        
+        // Fetch matching structure
+        const { data: structureData, error: structureError } = await supabase
+          .from('program_structure')
+          .select('id')
+          .eq('vertical', vertical)
+          .eq('semester', semester)
+          .maybeSingle();
+        
+        if (!structureError && structureData) {
+          updateData.structure_id = structureData.id;
+        }
+      }
+      
+      // Update course
+      const { data, error } = await supabase
+        .from('courses')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw new Error(`Failed to update course with ID ${id}: ${error.message}`);
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error(`Error updating course with ID ${id}:`, error);
+      throw new Error(`Unexpected error updating course with ID ${id}: ${error.message}`);
+    }
+  },
 
-    if (error) throw error;
-    return true;
+  // Delete a course
+  delete: async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(`Failed to delete course with ID ${id}: ${error.message}`);
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error(`Error deleting course with ID ${id}:`, error);
+      throw new Error(`Unexpected error deleting course with ID ${id}: ${error.message}`);
+    }
   }
 };
 
-// Supabase program structure API functions
+// Supabase program structure API functions with improved caching
 export const programStructureApi = {
   // Get all program structures with caching to reduce database calls on free tier
   getAll: async () => {
-    // Check if cache is valid
-    const now = Date.now();
-    if (programStructureCacheLastUpdated > 0 && 
-        now - programStructureCacheLastUpdated < CACHE_TTL && 
-        Object.keys(programStructureCache).length > 0) {
-      // Return cached data
-      return Object.values(programStructureCache);
-    }
+    try {
+      // Check if cache is valid
+      const now = Date.now();
+      if (programStructureCacheLastUpdated > 0 && 
+          now - programStructureCacheLastUpdated < CACHE_TTL && 
+          Object.keys(programStructureCache).length > 0) {
+        // Return cached data
+        return Object.values(programStructureCache);
+      }
 
-    // If cache is invalid or empty, fetch from database
-    const { data, error } = await supabase
-      .from('program_structure')
-      .select('*')
-      .order('vertical')
-      .order('semester');
+      // If cache is invalid or empty, fetch from database
+      const { data, error } = await supabase
+        .from('program_structure')
+        .select('*')
+        .order('vertical')
+        .order('semester');
 
-    if (error) throw error;
-    
-    // Update cache
-    programStructureCache = {};
-    if (data) {
-      data.forEach(item => {
-        const key = `${item.vertical}-${item.semester}`;
-        programStructureCache[key] = item;
-      });
+      if (error) {
+        throw new Error(`Failed to fetch program structures: ${error.message}`);
+      }
+      
+      // Update cache
+      programStructureCache = {};
+      if (data) {
+        data.forEach(item => {
+          const key = `${item.vertical}-${item.semester}`;
+          programStructureCache[key] = item;
+        });
+      }
+      programStructureCacheLastUpdated = now;
+      
+      return data || [];
+    } catch (error: any) {
+      console.error('Error fetching program structures:', error);
+      throw new Error(`Unexpected error fetching program structures: ${error.message}`);
     }
-    programStructureCacheLastUpdated = now;
-    
-    return data || [];
   },
 
   // Get structure by vertical and semester with caching
   getByVerticalAndSemester: async (vertical: string, semester: number) => {
-    // Check cache first
-    const cacheKey = `${vertical}-${semester}`;
-    const now = Date.now();
-    
-    if (programStructureCacheLastUpdated > 0 && 
-        now - programStructureCacheLastUpdated < CACHE_TTL && 
-        programStructureCache[cacheKey]) {
-      return programStructureCache[cacheKey];
-    }
+    try {
+      // Check cache first
+      const cacheKey = `${vertical}-${semester}`;
+      const now = Date.now();
+      
+      if (programStructureCacheLastUpdated > 0 && 
+          now - programStructureCacheLastUpdated < CACHE_TTL && 
+          programStructureCache[cacheKey]) {
+        return programStructureCache[cacheKey];
+      }
 
-    // If not in cache or cache expired, fetch from database
-    const { data, error } = await supabase
-      .from('program_structure')
-      .select('*')
-      .eq('vertical', vertical)
-      .eq('semester', semester)
-      .single();
+      // If not in cache or cache expired, fetch from database
+      const { data, error } = await supabase
+        .from('program_structure')
+        .select('*')
+        .eq('vertical', vertical)
+        .eq('semester', semester)
+        .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
-    
-    // Update cache for this specific item
-    if (data) {
-      programStructureCache[cacheKey] = data;
-      programStructureCacheLastUpdated = now;
+      if (error && error.code !== 'PGRST116') {
+        throw new Error(`Failed to fetch program structure for ${vertical} semester ${semester}: ${error.message}`);
+      }
+      
+      // Update cache for this specific item
+      if (data) {
+        programStructureCache[cacheKey] = data;
+        programStructureCacheLastUpdated = now;
+      }
+      
+      return data || null;
+    } catch (error: any) {
+      console.error(`Error fetching program structure for ${vertical} semester ${semester}:`, error);
+      throw new Error(`Unexpected error fetching program structure for ${vertical} semester ${semester}: ${error.message}`);
     }
-    
-    return data || null;
   },
 
   // Get recommended credits with caching
@@ -243,5 +310,6 @@ export const programStructureApi = {
   clearCache: () => {
     programStructureCache = {};
     programStructureCacheLastUpdated = 0;
+    return true;
   }
 };

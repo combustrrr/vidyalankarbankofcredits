@@ -1,16 +1,36 @@
-// Common interfaces used throughout the application
+/**
+ * Main types definitions for the application
+ */
 
+// API Response Type
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  timestamp?: string;
+}
+
+// Course Types
 export interface Course {
   id: string;
-  name: string;
-  description?: string;
-  duration?: string;
-  createdAt: string;
-  
-  // New fields for the expanded course form
-  code: string;
+  course_code: string;
   title: string;
-  type: string;
+  type: 'Theory' | 'Practical';
+  credits: number;
+  semester: number;
+  degree: string;
+  branch: string;
+  vertical: string;
+  basket: string;
+  structure_id?: string | null;
+  created_at: string;
+}
+
+export interface CourseCreationData {
+  course_code: string;
+  title: string;
+  type: 'Theory' | 'Practical';
   credits: number;
   semester: number;
   degree: string;
@@ -19,8 +39,67 @@ export interface Course {
   basket: string;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
+export interface CourseFilterOptions {
+  semester?: number;
+  vertical?: string;
+  basket?: string;
+  type?: 'Theory' | 'Practical';
+  degree?: string;
+  branch?: string;
+}
+
+// Program Structure Types
+export interface ProgramStructure {
+  id: string;
+  vertical: string;
+  semester: number;
+  recommended_credits: number;
+  created_at: string;
+}
+
+// Pagination Types
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+export interface PaginationOptions {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+// Admin Authentication
+export interface AdminAuthState {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+// User and authentication related interfaces
+export interface User {
+  id: string;
+  email: string;
+  role: UserRole;
+  name?: string;
+  createdAt: string;
+}
+
+export enum UserRole {
+  Admin = 'admin',
+  Student = 'student',
+  Faculty = 'faculty'
+}
+
+// Form state interfaces
+export interface FormState {
+  isSubmitting: boolean;
+  isSuccess: boolean;
+  error: string | null;
 }

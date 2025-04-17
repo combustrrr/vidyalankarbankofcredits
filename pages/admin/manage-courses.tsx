@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { supabase } from '../../utils/supabase';
 import { Database } from '../../types/supabase';
+import { getVerticals, programStructure } from '../../config';
 
 type Course = Database['public']['Tables']['courses']['Row'];
 
@@ -13,6 +14,8 @@ type FilterState = {
   semester: string;
   vertical: string;
   basket: string;
+  degree: string;
+  branch: string;
 };
 
 // Simple debounce function to prevent too many requests
@@ -44,6 +47,8 @@ const ManageCourses: React.FC = () => {
     semester: '',
     vertical: '',
     basket: '',
+    degree: '',
+    branch: '',
   });
   
   // Use debounced filters to prevent too many queries
@@ -78,6 +83,14 @@ const ManageCourses: React.FC = () => {
       
       if (debouncedFilters.basket) {
         query = query.eq('basket', debouncedFilters.basket);
+      }
+      
+      if (debouncedFilters.degree) {
+        query = query.eq('degree', debouncedFilters.degree);
+      }
+      
+      if (debouncedFilters.branch) {
+        query = query.eq('branch', debouncedFilters.branch);
       }
 
       // Order the results
@@ -150,19 +163,21 @@ const ManageCourses: React.FC = () => {
     return null; // Or a loading indicator
   }
 
-  // Extract unique values for filter dropdowns using filter method instead of Set
-  const uniqueVerticals = courses
-    .map(course => course.vertical)
-    .filter((value, index, self) => self.indexOf(value) === index);
-    
-  const uniqueBaskets = courses
-    .map(course => course.basket)
-    .filter((value, index, self) => self.indexOf(value) === index);
-    
-  const uniqueSemesters = courses
-    .map(course => course.semester)
-    .filter((value, index, self) => self.indexOf(value) === index)
-    .sort((a, b) => a - b);
+  // Get values from config instead of relying on existing courses
+  const configVerticals = programStructure.map(vertical => vertical.name);
+  
+  // Get all baskets from all verticals
+  const configBaskets: string[] = [];
+  programStructure.forEach(vertical => {
+    vertical.baskets.forEach(basket => {
+      if (!configBaskets.includes(basket.name)) {
+        configBaskets.push(basket.name);
+      }
+    });
+  });
+  
+  // Create a list of semesters 1-8
+  const configSemesters = Array.from({ length: 8 }, (_, i) => i + 1);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -231,7 +246,7 @@ const ManageCourses: React.FC = () => {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All Semesters</option>
-                {uniqueSemesters.map((semester) => (
+                {configSemesters.map((semester) => (
                   <option key={semester} value={semester}>{semester}</option>
                 ))}
               </select>
@@ -246,7 +261,7 @@ const ManageCourses: React.FC = () => {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All Verticals</option>
-                {uniqueVerticals.map((vertical) => (
+                {configVerticals.map((vertical) => (
                   <option key={vertical} value={vertical}>{vertical}</option>
                 ))}
               </select>
@@ -261,9 +276,35 @@ const ManageCourses: React.FC = () => {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">All Baskets</option>
-                {uniqueBaskets.map((basket) => (
+                {configBaskets.map((basket) => (
                   <option key={basket} value={basket}>{basket}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="degree" className="block text-sm font-medium text-gray-700">Degree</label>
+              <select
+                id="degree"
+                name="degree"
+                value={filters.degree}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">All Degrees</option>
+                <option value="BTech">BTech</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="branch" className="block text-sm font-medium text-gray-700">Branch</label>
+              <select
+                id="branch"
+                name="branch"
+                value={filters.branch}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">All Branches</option>
+                <option value="INFT">INFT</option>
               </select>
             </div>
             <div className="md:col-span-3 lg:col-span-5">
@@ -274,6 +315,8 @@ const ManageCourses: React.FC = () => {
                   semester: '',
                   vertical: '',
                   basket: '',
+                  degree: '',
+                  branch: '',
                 })}
                 className="text-sm text-indigo-600 hover:text-indigo-800"
               >

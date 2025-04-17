@@ -1,50 +1,113 @@
-// Utility script to check if required environment variables are set
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
+/**
+ * Environment Variables Checker
+ *
+ * Validates that all required environment variables are present and properly formatted.
+ * Exits the process with an error if any required variable is missing.
+ */
+require('dotenv').config({ path: '.env.local' });
 
-// Load environment variables from .env.local
-const envLocalPath = path.resolve(process.cwd(), '.env.local');
-const envPath = path.resolve(process.cwd(), '.env');
+// Define required environment variables
+const requiredVariables = [
+  'NEXT_PUBLIC_SUPABASE_URL', 
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+];
 
-// Check if .env.local exists
-if (fs.existsSync(envLocalPath)) {
-  console.log('✅ Found .env.local file');
-  dotenv.config({ path: envLocalPath });
-} else if (fs.existsSync(envPath)) {
-  console.log('✅ Found .env file');
-  dotenv.config({ path: envPath });
-} else {
-  console.log('⚠️ No .env.local or .env file found. Creating .env.local from example...');
-  // Create .env.local from .env.example if it exists
-  const envExamplePath = path.resolve(process.cwd(), '.env.example');
-  if (fs.existsSync(envExamplePath)) {
-    fs.copyFileSync(envExamplePath, envLocalPath);
-    console.log('✅ Created .env.local from .env.example');
-    console.log('⚠️ Please update the values in .env.local with your actual credentials');
-    dotenv.config({ path: envLocalPath });
-  } else {
-    console.error('❌ No .env.example file found. Please create one with the required variables.');
-    process.exit(1);
+// Define conditional environment variables (required in production only)
+const conditionalVariables = {
+  production: [
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'FRONTEND_URL'
+  ]
+};
+
+// Check if a URL is valid
+function isValidUrl(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 
-// Check required variables for database migration
-const requiredDbVars = ['SUPABASE_DB_HOST', 'SUPABASE_DB_USER', 'SUPABASE_DB_PASSWORD'];
-const missingDbVars = requiredDbVars.filter(varName => !process.env[varName]);
-
-if (missingDbVars.length > 0) {
-  console.error(`❌ Missing required environment variables for database migration: ${missingDbVars.join(', ')}`);
-  console.error('Please update your .env.local file with these variables');
-  process.exit(1);
-} else {
-  console.log('✅ All required database variables are set');
+// Check all environment variables
+function checkEnvironmentVariables() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const errors = [];
+  const warnings = [];
+  
+  // Check required variables
+  for (const varName of requiredVariables) {
+    if (!process.env[varName]) {
+      errors.push(`Missing required environment variable: ${varName}`);
+    } else if (varName.includes('URL') && !isValidUrl(process.env[varName])) {
+      warnings.push(`${varName} does not appear to be a valid URL: ${process.env[varName]}`);
+    }
+  }
+  
+  // Check conditional variables based on environment
+  if (isProduction) {
+    for (const varName of conditionalVariables.production) {
+      if (!process.env[varName]) {
+        errors.push(`Missing environment variable required in production: ${varName}`);
+      }
+    }
+  }
+  
+  // Check for Supabase URL and key format
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('supabase.co')) {
+    warnings.push('NEXT_PUBLIC_SUPABASE_URL does not appear to be a valid Supabase URL');
+  }
+  
+  if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && 
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length < 20) {
+    warnings.push('NEXT_PUBLIC_SUPABASE_ANON_KEY appears to be too short for a valid Supabase key');
+  }
+  
+  // Check database migration variables if service role key is provided
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const dbVars = ['SUPABASE_DB_HOST', 'SUPABASE_DB_USER', 'SUPABASE_DB_PASSWORD'];
+    const missingDbVars = dbVars.filter(v => !process.env[v]);
+    
+    if (missingDbVars.length > 0) {
+      warnings.push(`You provided a service role key but are missing database migration variables: ${missingDbVars.join(', ')}`);
+    }
+  }
+  
+  // Output results
+  if (errors.length > 0) {
+    console.error('\x1b[31m%s\x1b[0m', '❌ Environment validation failed:');
+    errors.forEach(error => console.error('\x1b[31m%s\x1b[0m', ` - ${error}`));
+    
+    if (warnings.length > 0) {
+      console.warn('\x1b[33m%s\x1b[0m', '⚠️ Warnings:');
+      warnings.forEach(warning => console.warn('\x1b[33m%s\x1b[0m', ` - ${warning}`));
+    }
+    
+    return {
+      isValid: false,
+      errors,
+      warnings
+    };
+  }
+  
+  if (warnings.length > 0) {
+    console.warn('\x1b[33m%s\x1b[0m', '⚠️ Environment validation warnings:');
+    warnings.forEach(warning => console.warn('\x1b[33m%s\x1b[0m', ` - ${warning}`));
+    console.warn('\x1b[33m%s\x1b[0m', 'The application might still work, but please check these issues.');
+  } else {
+    console.log('\x1b[32m%s\x1b[0m', '✅ Environment validation passed');
+  }
+  
+  return {
+    isValid: true,
+    errors,
+    warnings
+  };
 }
 
-module.exports = {
-  dbHost: process.env.SUPABASE_DB_HOST,
-  dbUser: process.env.SUPABASE_DB_USER,
-  dbPassword: process.env.SUPABASE_DB_PASSWORD
-};
+// Result of environment check
+const result = checkEnvironmentVariables();
 
-console.log('Environment check completed successfully!');
+// Export for use in other modules
+module.exports = result;

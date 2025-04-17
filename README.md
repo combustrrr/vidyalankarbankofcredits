@@ -1,95 +1,163 @@
 # Vidyalankar Bank of Credits
 
-## Project Description
+A full-stack web application for Vidyalankar Bank of Credits with Next.js, Tailwind CSS, and Express backend.
 
-This project is a full-stack web application for managing educational courses and credits at Vidyalankar. It's built using:
-- **Frontend**: Next.js with React and TypeScript
-- **Styling**: Tailwind CSS for responsive design
-- **Backend**: Node.js with Express.js
-- **API**: RESTful API endpoints
+## 🚀 Introduction
 
-The application supports different user roles (students, teachers, and administrators) and allows for course creation and management.
+This application manages the credit system for Vidyalankar Institute's academic programs. It features a course management system, program structure tracking, credit calculation, and an admin interface to manage courses and program structures.
 
-## Features
+## 📋 Features
 
-- **Authentication System**: Secure login for different user roles
-- **Admin Dashboard**: Course creation and management interface
-- **Course Management**: Create, view, and manage courses
-- **Responsive Design**: Works on desktop and mobile devices
+- Course management (create, update, delete)
+- Program structure tracking with verticals and baskets
+- Credit recommendation system
+- Admin authentication
+- Responsive UI with Tailwind CSS
+- REST API with Express
+- Database integration with Supabase
 
-## Setup Instructions
+## 🏗️ Project Structure
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/combustrrr/vidyalankarbankofcredits.git
-   cd vidyalankarbankofcredits
-   ```
+```
+/
+├── config/                    # Modular configuration
+│   ├── index.ts               # Configuration entry point
+│   ├── environment.ts         # Environment detection
+│   ├── server.ts              # Server configuration
+│   ├── client.ts              # Client-side configuration
+│   ├── supabase.ts            # Supabase configuration
+│   ├── features.ts            # Feature flags
+│   ├── course.ts              # Course configuration 
+│   └── program-structure.ts   # Program structure definitions
+├── context/                   # React context providers
+│   └── AdminAuthContext.tsx   # Admin authentication context
+├── pages/                     # Next.js pages
+│   ├── _app.tsx               # Next.js app entry point
+│   ├── index.tsx              # Home page
+│   ├── admin-auth.tsx         # Admin authentication page
+│   └── admin/                 # Admin pages
+│       ├── dashboard.tsx      # Admin dashboard
+│       ├── create-course.tsx  # Create course page
+│       ├── manage-courses.tsx # Manage courses page
+│       └── edit-course/       # Edit course pages
+│           └── [id].tsx       # Edit course by ID
+├── public/                    # Static assets
+├── server/                    # Express server
+│   ├── index.ts               # Server entry point
+│   ├── config/                # Server configuration
+│   │   └── supabase.ts        # Server Supabase client
+│   ├── controllers/           # API controllers
+│   │   └── courses.ts         # Course controller
+│   ├── middleware/            # Express middleware
+│   │   └── errorHandler.ts    # Global error handler
+│   └── routes/                # API routes
+│       └── courses.ts         # Course routes
+├── styles/                    # CSS styles
+├── types/                     # TypeScript type definitions
+│   ├── index.ts               # Common types
+│   └── supabase.ts            # Supabase-specific types
+└── utils/                     # Utility functions
+    ├── api.ts                 # Frontend API client
+    ├── supabase.ts            # Supabase client
+    ├── check-env.js           # Environment variable checker
+    └── database/              # Database utilities
+        └── migration-manager.js # Consolidated database migration tool
+```
 
+## 🛠️ Installation
+
+1. Clone the repository
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+
+```bash
+npm install
+```
 
 3. Set up environment variables:
-   - Copy the `.env.example` file to create a `.env` file:
-     ```bash
-     cp .env.example .env
-     ```
-   - Modify any values in the `.env` file as needed
 
-## Running the Project
+Create a `.env.local` file in the root directory with the following variables:
 
-### Development Mode
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SERVER_PORT=4000
+```
 
-1. Start the Next.js frontend:
-   ```bash
-   npm run dev
-   ```
+## 🔌 Database Setup
 
-2. In a separate terminal, start the Express backend:
-   ```bash
-   npm run dev:server
-   ```
+This project uses Supabase as its primary database. The setup is handled by our consolidated migration manager:
 
-3. Or run both simultaneously:
-   ```bash
-   npm run dev:full
-   ```
+```bash
+npm run migrate:db
+```
 
-### Production Mode
+For force migration with error skipping:
 
-1. Build the project:
-   ```bash
-   npm run build
-   ```
+```bash
+npm run migrate:db:force
+```
 
-2. Start the Next.js server:
-   ```bash
-   npm start
-   ```
+## 🚀 Development
 
-3. In a separate terminal, start the Express server:
-   ```bash
-   npm run serve
-   ```
+Run the development server:
 
-## Project Structure
+```bash
+npm run dev
+```
 
-- `/pages`: Next.js page components
-- `/components`: Reusable React components
-- `/context`: React context providers
-- `/server`: Express server code
-- `/styles`: Global CSS and Tailwind configuration
-- `/types`: TypeScript type definitions
-- `/utils`: Utility functions and API services
+This starts both the Next.js frontend and Express backend concurrently.
 
-## Admin Access
+## 🔧 Production Build
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Start the production server:
+
+```bash
+npm start
+```
+
+## 🔒 Admin Access
 
 To access the admin dashboard:
+
 1. Navigate to the home page
 2. Click on the Admin panel
 3. Use the passcode: `117110`
 
-## License
+## 📦 API Endpoints
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Courses
+
+- `GET /api/courses` - Get all courses (with pagination and filtering)
+- `GET /api/courses/:id` - Get a course by ID
+- `POST /api/courses` - Create a new course
+- `PUT /api/courses/:id` - Update a course
+- `DELETE /api/courses/:id` - Delete a course
+- `GET /api/courses/vertical/:vertical/semester/:semester/credits` - Get recommended credits
+
+## 📚 Key Technologies
+
+- **Frontend**: Next.js, React, Tailwind CSS
+- **Backend**: Express.js, Node.js
+- **Database**: Supabase (PostgreSQL)
+- **Language**: TypeScript
+- **Authentication**: Custom admin auth
+- **Deployment**: Vercel (frontend), Heroku (backend)
+
+## 🧪 Development Guidelines
+
+1. **Configuration**: Use the centralized config modules in the `/config` directory
+2. **API Utilities**: Use the API utilities in `/utils/api.ts`
+3. **Type Safety**: Define types in `/types` directory
+4. **Database Access**: Use the Supabase client in `/utils/supabase.ts`
+5. **Error Handling**: Use the `createApiError` utility for consistent API errors
+
+## 📖 License
+
+[MIT](LICENSE)

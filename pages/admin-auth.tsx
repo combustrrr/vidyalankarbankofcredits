@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAdminAuth } from '../context/AdminAuthContext';
+import { adminPasscode } from '../config/environment';
 
 const AdminAuth: React.FC = () => {
   const [passcode, setPasscode] = useState('');
@@ -18,7 +19,7 @@ const AdminAuth: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === '117110') {
+    if (passcode === adminPasscode) {
       setIsAdminAuthenticated(true);
       setConfirmation('Admin logged in');
       setTimeout(() => {

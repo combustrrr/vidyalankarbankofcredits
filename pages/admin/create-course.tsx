@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAdminAuth } from '../../context/AdminAuthContext';
-import { supabaseCourseApi, programStructureApi } from '../../utils/supabase';
+import { courseApi, programStructureApi } from '../../utils/supabase';
 import { ProgramStructure } from '../../utils/supabase';
 import { 
   getVerticals, 
@@ -223,7 +223,7 @@ const CreateCourse: React.FC = () => {
     
     try {
       // Use Supabase to create a new course - the structure_id will be linked automatically
-      await supabaseCourseApi.create({
+      await courseApi.create({
         course_code: formData.courseCode,
         title: formData.courseTitle,
         type: formData.courseType as 'Theory' | 'Practical',

@@ -1,12 +1,54 @@
 /**
- * Central configuration file for Vidyalankar Bank of Credits
+ * Central configuration file for the application
  * 
- * This file serves as the single source of truth for program structure definitions,
- * including verticals, baskets, and credit mappings.
- * 
- * When changes to program structure are needed, update this file only,
- * and the changes will propagate throughout the application.
+ * This file provides a single source of truth for configuration values
+ * used throughout both client and server parts of the application.
  */
+
+// Environment detection
+export const isDevelopment = process.env.NODE_ENV !== 'production';
+export const isProduction = process.env.NODE_ENV === 'production';
+export const isServer = typeof window === 'undefined';
+
+// Server configuration
+export const serverConfig = {
+  port: process.env.SERVER_PORT || 4000,
+  apiPrefix: '/api',
+  allowedOrigins: isProduction
+    ? [process.env.FRONTEND_URL || '']
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002']
+};
+
+// Client-side configuration
+export const clientConfig = {
+  appName: 'Vidyalankar Bank of Credits',
+  apiUrl: isProduction ? process.env.API_URL : `http://localhost:${serverConfig.port}`,
+  apiTimeout: 15000, // 15 seconds
+  defaultPageSize: 10
+};
+
+// Supabase configuration (safe for client exposure)
+export const supabaseConfig = {
+  url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+};
+
+// Feature flags
+export const features = {
+  enableProgramStructure: true,
+  enableStudentRegistration: false,
+  enableElectiveSelection: false
+};
+
+// Course configuration
+export const courseConfig = {
+  defaultCredits: 3,
+  types: ['Theory', 'Practical'],
+  baskets: ['Core', 'Elective', 'Lab', 'Project'],
+  degrees: ['BTech', 'MTech', 'PhD'],
+  branches: ['Computer Science', 'Information Technology', 'Electronics', 'Mechanical', 'Civil'],
+  verticals: ['Computer Science', 'Information Technology', 'AI/ML', 'Cybersecurity', 'IoT']
+};
 
 // Interface for semester-wise credit recommendation
 export interface SemesterCredits {

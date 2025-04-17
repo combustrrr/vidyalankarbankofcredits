@@ -31,13 +31,15 @@ BEFORE INSERT OR UPDATE ON public.courses
 FOR EACH ROW
 EXECUTE FUNCTION link_course_to_structure();
 
--- Update existing courses to link them to the program structure
--- This is a small batch update, but if you have many courses (1000+), you may want to 
--- handle this in your application code instead, processing a few records at a time
-UPDATE public.courses c
-SET structure_id = ps.id
-FROM public.program_structure ps
-WHERE c.vertical = ps.vertical
-AND c.semester = ps.semester
-AND c.structure_id IS NULL
-LIMIT 500; -- Limit the number of updates per execution to reduce load
+-- Update existing courses to link them to the program structure using the correct approach
+WITH updated_courses AS (
+    SELECT c.id, ps.id AS structure_id
+    FROM public.courses c
+    JOIN public.program_structure ps ON c.vertical = ps.vertical AND c.semester = ps.semester
+    WHERE c.structure_id IS NULL
+    LIMIT 500
+)
+UPDATE public.courses
+SET structure_id = updated_courses.structure_id
+FROM updated_courses
+WHERE public.courses.id = updated_courses.id;

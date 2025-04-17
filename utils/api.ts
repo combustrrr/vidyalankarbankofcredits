@@ -1,56 +1,140 @@
-import axios from 'axios';
-import { ApiResponse, Course } from '../types';
+/**
+ * Client-side API utility
+ * 
+ * Provides a structured interface for making API calls from the frontend
+ */
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import { clientConfig } from '../config';
+import { ApiResponse, CourseCreationData, Course, PaginatedResult, PaginationOptions, CourseFilterOptions } from '../types';
 
-// Base URL for API requests - now we can always use /api path
-// since Next.js will proxy these requests to our Express server
-const API_URL = '/api';
-
-// Create an axios instance with default config
-export const apiClient = axios.create({
-  baseURL: API_URL,
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: clientConfig.apiUrl,
+  timeout: clientConfig.apiTimeout,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// API functions for courses
+// Error handler
+const handleApiError = (error: AxiosError): never => {
+  if (error.response) {
+    // The request was made and the server responded with a status code
+    // that falls out of the range of 2xx
+    const data = error.response.data as any;
+    throw new Error(data?.error?.message || 'Server error');
+  } else if (error.request) {
+    // The request was made but no response was received
+    throw new Error('No response from server. Please check your network connection.');
+  } else {
+    // Something happened in setting up the request that triggered an Error
+    throw new Error(error.message || 'Unknown error occurred');
+  }
+};
+
+// API endpoints
 export const courseApi = {
-  // Get all courses
-  getAll: async (): Promise<Course[]> => {
+  // Get all courses with pagination and filtering
+  getAll: async (
+    options: PaginationOptions & CourseFilterOptions = {}
+  ): Promise<ApiResponse<PaginatedResult<Course>>> => {
     try {
-      const response = await apiClient.get<ApiResponse<{ courses: Course[] }>>('/courses');
-      return response.data.data?.courses || [];
+      const { page, pageSize, sortBy, sortOrder, ...filters } = options;
+      
+      const params = {
+        page,
+        pageSize,
+        sortBy,
+        sortOrder,
+        ...filters
+      };
+      
+      const response = await api.get('/api/courses', { params });
+      return response.data;
     } catch (error) {
-      console.error('Error fetching courses:', error);
-      throw error;
+      return handleApiError(error as AxiosError);
     }
   },
   
-  // Get a single course by ID
-  getById: async (id: string): Promise<Course> => {
+  // Get a course by ID
+  getById: async (id: string): Promise<ApiResponse<Course>> => {
     try {
-      const response = await apiClient.get<ApiResponse<{ course: Course }>>(`/courses/${id}`);
-      if (!response.data.data?.course) {
-        throw new Error('Course not found');
-      }
-      return response.data.data.course;
+      const response = await api.get(`/api/courses/${id}`);
+      return response.data;
     } catch (error) {
-      console.error(`Error fetching course with ID ${id}:`, error);
-      throw error;
+      return handleApiError(error as AxiosError);
     }
   },
   
   // Create a new course
-  create: async (courseData: Omit<Course, 'id' | 'createdAt'>): Promise<Course> => {
+  create: async (courseData: CourseCreationData): Promise<ApiResponse<Course>> => {
     try {
-      const response = await apiClient.post<ApiResponse<{ course: Course }>>('/courses', courseData);
-      if (!response.data.data?.course) {
-        throw new Error('Failed to create course');
-      }
-      return response.data.data.course;
+      const response = await api.post('/api/courses', courseData);
+      return response.data;
     } catch (error) {
-      console.error('Error creating course:', error);
-      throw error;
+      return handleApiError(error as AxiosError);
+    }
+  },
+  
+  // Update a course
+  update: async (id: string, courseData: Partial<CourseCreationData>): Promise<ApiResponse<Course>> => {
+    try {
+      const response = await api.put(`/api/courses/${id}`, courseData);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  },
+  
+  // Delete a course
+  delete: async (id: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await api.delete(`/api/courses/${id}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  },
+  
+  // Get recommended credits for a vertical and semester
+  getRecommendedCredits: async (vertical: string, semester: number): Promise<ApiResponse<{
+    vertical: string;
+    semester: number;
+    recommended_credits: number;
+  }>> => {
+    try {
+      const response = await api.get(`/api/courses/vertical/${vertical}/semester/${semester}/credits`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
     }
   }
 };
+
+// Add request interceptor for auth tokens, etc.
+api.interceptors.request.use(
+  (config) => {
+    // Add auth token if available
+    const token = localStorage.getItem('authToken');
+    if (token && config.headers) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for global error handling
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    // Global error handling logic here
+    return Promise.reject(error);
+  }
+);
+
+export default api;

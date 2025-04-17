@@ -1,51 +1,116 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { ApiResponse, Course } from '../../types';
+import { supabaseCourseApi } from '../../utils/supabase';
 
-// In-memory storage for courses (in a real app, this would be a database)
-let courses: any[] = [];
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ApiResponse<any>>
+) {
+  const { method } = req;
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  switch (req.method) {
-    case 'GET':
-      return getCourses(req, res);
-    case 'POST':
-      return createCourse(req, res);
-    default:
-      res.setHeader('Allow', ['GET', 'POST']);
-      return res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
-}
-
-// Get all courses
-function getCourses(req: NextApiRequest, res: NextApiResponse) {
-  return res.status(200).json({ courses });
-}
-
-// Create a new course
-function createCourse(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { name, description, duration } = req.body;
+    switch (method) {
+      case 'GET': {
+        const { id } = req.query;
+
+        if (id && typeof id === 'string') {
+          // Get a single course
+          const course = await supabaseCourseApi.getById(id);
+          return res.status(200).json({ success: true, data: { course } });
+        } else {
+          // Get all courses with pagination
+          const page = req.query.page ? parseInt(req.query.page as string) : 0;
+          const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string) : 20;
+          
+          const { data, totalCount, currentPage, pageSize: resultPageSize } = await supabaseCourseApi.getAll(page, pageSize);
+          
+          return res.status(200).json({ 
+            success: true, 
+            data: { 
+              courses: data,
+              pagination: {
+                totalCount,
+                currentPage,
+                pageSize: resultPageSize,
+                totalPages: Math.ceil(totalCount / resultPageSize)
+              }
+            } 
+          });
+        }
+      }
+      
+      case 'POST': {
+        // Create a new course
+        const courseData = req.body;
+        
+        // Perform validation
+        const requiredFields = ['course_code', 'title', 'type', 'credits', 'semester', 'degree', 'branch', 'vertical', 'basket'];
+        const missingFields = requiredFields.filter(field => !courseData[field]);
+        
+        if (missingFields.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: `Missing required fields: ${missingFields.join(', ')}`
+          });
+        }
+        
+        // Create course
+        const createdCourse = await supabaseCourseApi.create(courseData);
+        return res.status(201).json({ success: true, data: { course: createdCourse } });
+      }
+      
+      case 'PUT': {
+        // Update an existing course
+        const { id } = req.query;
+        const courseData = req.body;
+        
+        if (!id || typeof id !== 'string') {
+          return res.status(400).json({
+            success: false,
+            error: 'Course ID is required'
+          });
+        }
+        
+        const updatedCourse = await supabaseCourseApi.update(id, courseData);
+        return res.status(200).json({ success: true, data: { course: updatedCourse } });
+      }
+      
+      case 'DELETE': {
+        // Delete a course
+        const { id } = req.query;
+        
+        if (!id || typeof id !== 'string') {
+          return res.status(400).json({
+            success: false,
+            error: 'Course ID is required'
+          });
+        }
+        
+        await supabaseCourseApi.delete(id);
+        return res.status(200).json({ success: true });
+      }
+      
+      default:
+        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+        return res.status(405).json({ 
+          success: false, 
+          error: `Method ${method} Not Allowed` 
+        });
+    }
+  } catch (error: any) {
+    console.error('API Error:', error);
     
-    // Validate request body
-    if (!name || !description || !duration) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Handle specific error cases
+    if (error.code === 'PGRST116') {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Resource not found'
+      });
     }
     
-    // Create new course with a unique ID
-    const newCourse = {
-      id: Date.now().toString(),
-      name,
-      description,
-      duration,
-      createdAt: new Date().toISOString()
-    };
-    
-    // Add to our "database"
-    courses.push(newCourse);
-    
-    // Return the newly created course
-    return res.status(201).json({ course: newCourse });
-  } catch (error) {
-    console.error('Error creating course:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message || 'An unexpected error occurred'
+    });
   }
 }
