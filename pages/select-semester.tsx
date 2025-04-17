@@ -10,11 +10,13 @@ const SelectSemester: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Protect this route
+  // Protect this route and ensure we have student data
   useEffect(() => {
-    if (!isStudentAuthenticated) {
+    if (!isStudentAuthenticated || !student) {
       router.replace('/');
-    } else if (student?.semester !== null) {
+    } else if (student.semester !== null) {
+      // If semester is already set, redirect to dashboard
+      // This prevents users from changing their semester once set
       router.replace('/dashboard');
     }
   }, [isStudentAuthenticated, student, router]);
@@ -26,8 +28,10 @@ const SelectSemester: React.FC = () => {
       return;
     }
 
-    if (!student?.id) {
-      setError('Student ID is missing');
+    const semesterNumber = parseInt(selectedSemester, 10);
+    // Validate semester range
+    if (semesterNumber < 1 || semesterNumber > 8) {
+      setError('Invalid semester selected. Please choose between 1 and 8.');
       return;
     }
 
@@ -35,30 +39,48 @@ const SelectSemester: React.FC = () => {
     setError('');
 
     try {
+      // Ensure we have student data
+      if (!student || !student.id) {
+        throw new Error('Student authentication data is missing. Please try logging in again.');
+      }
+
+      // Double check that semester hasn't been set yet
+      const { data: currentStudent } = await supabase
+        .from('students')
+        .select('semester')
+        .eq('id', student.id)
+        .single();
+
+      if (currentStudent?.semester !== null) {
+        throw new Error('Semester has already been set and cannot be changed.');
+      }
+
       // Update the student's semester in the database
       const { data, error: updateError } = await supabase
         .from('students')
-        .update({ semester: parseInt(selectedSemester, 10) })
+        .update({ semester: semesterNumber })
         .eq('id', student.id)
+        .is('semester', null) // Only update if semester is null
         .select()
         .single();
 
       if (updateError) throw updateError;
 
-      // Update the local student state
+      // Update the local student state with all existing data plus new semester
       if (data) {
-        setStudent({ ...student!, semester: data.semester });
+        setStudent({ ...student, semester: data.semester });
+        // Redirect to dashboard after successful update
+        router.push('/dashboard');
       }
-
-      // Redirect to dashboard
-      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to update semester');
+      console.error('Error updating semester:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Don't render anything if not authenticated or no student data
   if (!isStudentAuthenticated || !student) {
     return null;
   }

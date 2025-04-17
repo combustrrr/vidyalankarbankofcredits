@@ -35,15 +35,26 @@ const Login: React.FC = () => {
     try {
       const response = await studentApi.login(formData);
       
-      // Set authentication state with JWT token
-      setIsStudentAuthenticated(true);
+      if (!response.student || !response.token) {
+        throw new Error('Invalid response from server');
+      }
+
+      // First set the student data and token
       setStudent(response.student);
       setToken(response.token);
       
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Then set authentication state
+      setIsStudentAuthenticated(true);
+      
+      // Determine redirect based on whether semester is set
+      if (response.student.semester === null) {
+        router.push('/select-semester');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid credentials. Please try again.');
+      console.error('Login error:', err);
     } finally {
       setIsLoading(false);
     }

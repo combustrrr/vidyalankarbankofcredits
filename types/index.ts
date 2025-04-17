@@ -145,4 +145,5 @@ export interface CompletedCourse {
   semester: number;
   credit_awarded: number;
   completed_at: string;
+  courses: Course;
 }
