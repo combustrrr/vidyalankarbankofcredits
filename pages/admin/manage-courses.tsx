@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { supabase } from '../../utils/supabase';
@@ -15,6 +15,23 @@ type FilterState = {
   basket: string;
 };
 
+// Simple debounce function to prevent too many requests
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 const ManageCourses: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,26 +45,45 @@ const ManageCourses: React.FC = () => {
     vertical: '',
     basket: '',
   });
+  
+  // Use debounced filters to prevent too many queries
+  const debouncedFilters = useDebounce(filters, 300);
 
   const router = useRouter();
   const { isAdminAuthenticated, logout } = useAdminAuth();
 
-  // Enhanced authentication check
-  useEffect(() => {
-    if (!isAdminAuthenticated) {
-      router.replace('/admin-auth');
-    } else {
-      fetchCourses();
-    }
-  }, [isAdminAuthenticated, router]);
-
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('courses')
-        .select('*')
-        .order('course_code', { ascending: true });
+        .select('*');
+      
+      // Apply filters to the query
+      if (debouncedFilters.searchQuery) {
+        query = query.or(`course_code.ilike.%${debouncedFilters.searchQuery}%,title.ilike.%${debouncedFilters.searchQuery}%`);
+      }
+      
+      if (debouncedFilters.courseType) {
+        query = query.eq('type', debouncedFilters.courseType);
+      }
+      
+      if (debouncedFilters.semester) {
+        query = query.eq('semester', parseInt(debouncedFilters.semester));
+      }
+      
+      if (debouncedFilters.vertical) {
+        query = query.eq('vertical', debouncedFilters.vertical);
+      }
+      
+      if (debouncedFilters.basket) {
+        query = query.eq('basket', debouncedFilters.basket);
+      }
+
+      // Order the results
+      query = query.order('course_code', { ascending: true });
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setCourses(data || []);
@@ -57,7 +93,16 @@ const ManageCourses: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedFilters]);
+
+  // Enhanced authentication check
+  useEffect(() => {
+    if (!isAdminAuthenticated) {
+      router.replace('/admin-auth');
+    } else {
+      fetchCourses();
+    }
+  }, [isAdminAuthenticated, router, fetchCourses]);
 
   const handleDeleteClick = (course: Course) => {
     setCourseToDelete(course);
@@ -97,27 +142,8 @@ const ManageCourses: React.FC = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  // Filter courses based on filter state
-  const filteredCourses = courses.filter(course => {
-    // Filter by search query (checks multiple fields)
-    const searchMatch = !filters.searchQuery || 
-      course.course_code.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-      course.title.toLowerCase().includes(filters.searchQuery.toLowerCase());
-    
-    // Filter by course type
-    const typeMatch = !filters.courseType || course.type === filters.courseType;
-    
-    // Filter by semester
-    const semesterMatch = !filters.semester || course.semester.toString() === filters.semester;
-    
-    // Filter by vertical
-    const verticalMatch = !filters.vertical || course.vertical === filters.vertical;
-    
-    // Filter by basket
-    const basketMatch = !filters.basket || course.basket === filters.basket;
-    
-    return searchMatch && typeMatch && semesterMatch && verticalMatch && basketMatch;
-  });
+  // No need to filter courses again since we're already filtering in the database query
+  const filteredCourses = courses;
 
   // Don't render the actual content until we're sure user is authenticated
   if (!isAdminAuthenticated) {

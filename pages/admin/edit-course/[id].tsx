@@ -3,6 +3,13 @@ import { useRouter } from 'next/router';
 import { useAdminAuth } from '../../../context/AdminAuthContext';
 import { supabase } from '../../../utils/supabase';
 import { Database } from '../../../types/supabase';
+import { 
+  getVerticals, 
+  getBasketsForVertical, 
+  getVerticalCode, 
+  getBasketCode, 
+  getRecommendedCredits
+} from '../../../config';
 
 type Course = Database['public']['Tables']['courses']['Row'];
 
@@ -24,10 +31,26 @@ const EditCourse: React.FC = () => {
     branch: 'INFT',   // Pre-filled
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [verticals, setVerticals] = useState<string[]>([]);
+  const [availableBaskets, setAvailableBaskets] = useState<string[]>([]);
 
   const router = useRouter();
   const { id } = router.query;
   const { isAdminAuthenticated, logout } = useAdminAuth();
+
+  // Load verticals from config on initial render
+  useEffect(() => {
+    setVerticals(getVerticals());
+  }, []);
+  
+  // Update available baskets when vertical changes
+  useEffect(() => {
+    if (formData.vertical) {
+      setAvailableBaskets(getBasketsForVertical(formData.vertical));
+    } else {
+      setAvailableBaskets([]);
+    }
+  }, [formData.vertical]);
 
   // Enhanced authentication check
   useEffect(() => {
@@ -351,9 +374,11 @@ const EditCourse: React.FC = () => {
                   } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                 >
                   <option value="" disabled>Select Vertical</option>
-                  <option value="Core">Core</option>
-                  <option value="Professional">Professional</option>
-                  <option value="Elective">Elective</option>
+                  {verticals.map(vertical => (
+                    <option key={vertical} value={vertical}>
+                      {vertical}
+                    </option>
+                  ))}
                 </select>
                 {errors.vertical && (
                   <p className="mt-1 text-sm text-red-500">{errors.vertical}</p>
@@ -373,13 +398,18 @@ const EditCourse: React.FC = () => {
                   className={`mt-1 block w-full px-3 py-2 bg-white border ${
                     errors.basket ? 'border-red-500' : 'border-gray-300'
                   } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                  disabled={!formData.vertical}
                 >
                   <option value="" disabled>Select Basket</option>
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                  <option value="D">D</option>
+                  {availableBaskets.map(basket => (
+                    <option key={basket} value={basket}>
+                      {basket}
+                    </option>
+                  ))}
                 </select>
+                {!formData.vertical && (
+                  <p className="mt-1 text-xs text-gray-500">Please select a vertical first</p>
+                )}
                 {errors.basket && (
                   <p className="mt-1 text-sm text-red-500">{errors.basket}</p>
                 )}

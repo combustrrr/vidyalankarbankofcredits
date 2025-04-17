@@ -48,6 +48,22 @@
       "console": "integratedTerminal",
       "port": 9232, // Custom port for migrations
       "envFile": "${workspaceFolder}/.env.local"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "✅ Run Complete App (All-in-One)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:all"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "envFile": "${workspaceFolder}/.env.local",
+      "preLaunchTask": "setup-database",
+      "presentation": {
+        "group": "main",
+        "order": 1
+      },
+      "description": "Run migrations and start the complete application in one click"
     }
   ],
   "compounds": [

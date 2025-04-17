@@ -3,26 +3,14 @@ import { useRouter } from 'next/router';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { supabaseCourseApi, programStructureApi } from '../../utils/supabase';
 import { ProgramStructure } from '../../utils/supabase';
-
-// Vertical to subject area code mapping
-const verticalToSubjectCode: Record<string, string> = {
-  'Basic Science Course (BSC/ESC)': 'BSC',
-  'Engineering Science (ESC)': 'ESC',
-  'Programme Core Course (PCC)': 'PCC',
-  'Programme Elective Course (PEC)': 'PEC',
-  'Multidisciplinary Minor (MDM)': 'MDM',
-  'Open Elective (OE)': 'OE',
-  'Vocational and Skill Enhancement Courses (VSEC)': 'VSEC',
-  'Ability Enhancement Courses (AEC)': 'AEC',
-  'Entrepreneurship/Economics/Management (EEMC)': 'EEMC',
-  'Indian Knowledge System (IKS)': 'IKS',
-  'Value Education Courses (VEC)': 'VEC',
-  'Research Methodology (RM)': 'RM',
-  'Comm. Engg. Project/Field Project (CEP/FP)': 'CEP',
-  'Project': 'PROJ',
-  'Internship/OJT': 'INTP',
-  'Co-Curricular Courses (CC)': 'CC'
-};
+import { 
+  getVerticals, 
+  getBasketsForVertical, 
+  getVerticalCode, 
+  getBasketCode, 
+  getRecommendedCredits,
+  canAdminCreateVertical 
+} from '../../config';
 
 const CreateCourse: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -47,9 +35,32 @@ const CreateCourse: React.FC = () => {
   const [isLoadingRecommendation, setIsLoadingRecommendation] = useState(false);
   const [programStructures, setProgramStructures] = useState<ProgramStructure[]>([]);
   const [isLoadingStructures, setIsLoadingStructures] = useState(true);
+  const [verticals, setVerticals] = useState<string[]>([]);
+  const [availableBaskets, setAvailableBaskets] = useState<string[]>([]);
   
   const router = useRouter();
   const { isAdminAuthenticated, logout } = useAdminAuth();
+
+  // Load verticals from config on initial render
+  useEffect(() => {
+    setVerticals(getVerticals());
+  }, []);
+  
+  // Update available baskets when vertical changes
+  useEffect(() => {
+    if (formData.vertical) {
+      setAvailableBaskets(getBasketsForVertical(formData.vertical));
+      // Clear basket selection when vertical changes
+      if (formData.basket && !getBasketsForVertical(formData.vertical).includes(formData.basket)) {
+        setFormData(prev => ({
+          ...prev,
+          basket: ''
+        }));
+      }
+    } else {
+      setAvailableBaskets([]);
+    }
+  }, [formData.vertical]);
 
   // Load all program structures
   useEffect(() => {
@@ -74,8 +85,8 @@ const CreateCourse: React.FC = () => {
   const generateCourseCode = (vertical: string, semester: string, courseType: string): string => {
     if (!vertical || !semester || !courseType) return '';
     
-    // Get subject area code from vertical
-    const subjectCode = verticalToSubjectCode[vertical] || vertical.substring(0, 3).toUpperCase();
+    // Get subject area code from vertical using the config helper
+    const subjectCode = getVerticalCode(vertical);
     
     // Format semester as 2 digits
     const semesterCode = semester.padStart(2, '0');
@@ -100,7 +111,7 @@ const CreateCourse: React.FC = () => {
     }
   }, [formData.vertical, formData.semester, formData.courseType, useAutoGenCode]);
 
-  // Fetch recommended credits from the program structure API when vertical and semester change
+  // Fetch recommended credits from config when vertical and semester change
   useEffect(() => {
     const fetchRecommendedCredits = async () => {
       if (formData.vertical && formData.semester) {
@@ -110,10 +121,8 @@ const CreateCourse: React.FC = () => {
           setRecommendedCredit(null);
           
           const semester = parseInt(formData.semester, 10);
-          const recommendedCredits = await programStructureApi.getRecommendedCredits(
-            formData.vertical,
-            semester
-          );
+          // Use the config helper to get recommended credits
+          const recommendedCredits = getRecommendedCredits(formData.vertical, semester);
           
           setRecommendedCredit(recommendedCredits);
           
@@ -298,8 +307,7 @@ const CreateCourse: React.FC = () => {
                 {isLoadingStructures ? (
                   <option value="" disabled>Loading verticals...</option>
                 ) : (
-                  // Get unique verticals from program structures
-                  [...new Set(programStructures.map(ps => ps.vertical))].map((vertical) => (
+                  verticals.map((vertical) => (
                     <option key={vertical} value={vertical}>
                       {vertical}
                     </option>
@@ -483,16 +491,18 @@ const CreateCourse: React.FC = () => {
                 className={`mt-1 block w-full px-3 py-2 bg-white border ${
                   errors.basket ? 'border-red-500' : 'border-gray-300'
                 } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+                disabled={!formData.vertical}
               >
                 <option value="" disabled>Select Basket</option>
-                <option value="Foundational">Foundational</option>
-                <option value="Programming">Programming</option>
-                <option value="Communication">Communication</option>
-                <option value="Design Thinking">Design Thinking</option>
-                <option value="Research Oriented">Research Oriented</option>
-                <option value="Entrepreneurship Track">Entrepreneurship Track</option>
-                <option value="Other">Other</option>
+                {availableBaskets.map(basket => (
+                  <option key={basket} value={basket}>
+                    {basket}
+                  </option>
+                ))}
               </select>
+              {!formData.vertical && (
+                <p className="mt-1 text-xs text-gray-500">Please select a vertical first</p>
+              )}
               {errors.basket && (
                 <p className="mt-1 text-sm text-red-500">{errors.basket}</p>
               )}
@@ -533,7 +543,7 @@ const CreateCourse: React.FC = () => {
           <div className="bg-blue-50 p-3 rounded-md text-sm text-blue-700 border border-blue-100">
             <h4 className="font-medium mb-1">Course Code Format</h4>
             <p>The code is auto-generated using this pattern: <code className="bg-blue-100 px-1 py-0.5 rounded">AREA + SEMESTER + TYPE</code></p>
-            <p className="mt-1">Example: <code className="bg-blue-100 px-1 py-0.5 rounded">BS04T</code> = Basic Science, Semester 4, Theory</p>
+            <p className="mt-1">Example: <code className="bg-blue-100 px-1 py-0.5 rounded">BSC04T</code> = Basic Science, Semester 4, Theory</p>
           </div>
           
           {error && <p className="text-red-500 text-sm">{error}</p>}

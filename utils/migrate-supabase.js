@@ -1,20 +1,31 @@
 // Supabase migration script
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// Check for required environment variables
-const requiredEnvVars = ['SUPABASE_DB_HOST', 'SUPABASE_DB_USER', 'SUPABASE_DB_PASSWORD'];
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-if (missingVars.length > 0) {
-  console.error(`❌ Missing required environment variables: ${missingVars.join(', ')}`);
-  console.error('Make sure these are set in your .env.local file or environment');
+// Load environment variables using our checker
+try {
+  console.log('Checking environment variables...');
+  // This will log any missing variables and exit if required ones are not set
+  const env = require('./check-env');
+} catch (error) {
+  console.error('Failed to load environment variables:', error.message);
   process.exit(1);
+}
+
+// Check if psql is installed
+function isPsqlInstalled() {
+  try {
+    execSync('which psql', { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 // Define SQL files to run
 const migrationFiles = [
+  'create-courses-table.sql',
   'setup-program-structure.sql',
   'update-courses-table.sql'
 ];
@@ -42,6 +53,14 @@ async function executeSqlFile(filePath) {
       stdio: 'inherit' // Show output in console
     });
     
+    psql.on('error', (err) => {
+      if (err.code === 'ENOENT') {
+        reject('The psql command was not found. Please make sure PostgreSQL client tools are installed.');
+      } else {
+        reject(`Error executing psql: ${err.message}`);
+      }
+    });
+    
     psql.on('close', (code) => {
       if (code === 0) {
         console.log(`✅ Successfully executed ${filePath}`);
@@ -56,6 +75,17 @@ async function executeSqlFile(filePath) {
 // Main function to run migrations
 async function runMigrations() {
   console.log('🚀 Starting Supabase migrations...');
+  
+  // Check for psql before proceeding
+  if (!isPsqlInstalled()) {
+    console.error('❌ Error: PostgreSQL client (psql) is not installed.');
+    console.error('Please install PostgreSQL client tools with one of these commands:');
+    console.error('  - Ubuntu/Debian: sudo apt-get install postgresql-client');
+    console.error('  - macOS: brew install postgresql');
+    console.error('  - Windows: Download from https://www.postgresql.org/download/windows/');
+    console.error('After installing, run this script again.');
+    process.exit(1);
+  }
   
   for (const file of migrationFiles) {
     const filePath = path.join(__dirname, file);
