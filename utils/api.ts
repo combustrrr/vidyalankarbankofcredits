@@ -5,7 +5,7 @@
  */
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { clientConfig } from '../config';
-import { ApiResponse, CourseCreationData, Course, PaginatedResult, PaginationOptions, CourseFilterOptions } from '../types';
+import { ApiResponse, CourseCreationData, Course, PaginatedResult, PaginationOptions, CourseFilterOptions, Student, StudentRegistrationData, StudentLoginData } from '../types';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -22,7 +22,7 @@ const handleApiError = (error: AxiosError): never => {
     // The request was made and the server responded with a status code
     // that falls out of the range of 2xx
     const data = error.response.data as any;
-    throw new Error(data?.error?.message || 'Server error');
+    throw new Error(data?.error?.message || data?.message || 'Server error');
   } else if (error.request) {
     // The request was made but no response was received
     throw new Error('No response from server. Please check your network connection.');
@@ -111,14 +111,79 @@ export const courseApi = {
   }
 };
 
+// Student API endpoints
+export const studentApi = {
+  // Register a new student
+  register: async (data: StudentRegistrationData): Promise<ApiResponse<Student>> => {
+    try {
+      const response = await api.post('/api/students/signup', data);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  },
+
+  // Login a student and get JWT token
+  login: async (data: StudentLoginData): Promise<{
+    message: string;
+    student: Student;
+    token: string;
+  }> => {
+    try {
+      const response = await api.post('/api/students/login', data);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  },
+  
+  // Get the current student's profile
+  getProfile: async (rollNumber: string): Promise<ApiResponse<Student>> => {
+    try {
+      const response = await api.get(`/api/students/profile?roll_number=${rollNumber}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  }
+};
+
+// Admin API endpoints
+export const adminApi = {
+  // Get basket credits summary
+  getBasketCredits: async (): Promise<{
+    message: string;
+    basketCredits: Array<{
+      vertical: string;
+      basket: string;
+      total_credits: number;
+    }>;
+    totalCredits: number;
+  }> => {
+    try {
+      const response = await api.get('/api/basket-credits');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  }
+};
+
 // Add request interceptor for auth tokens, etc.
 api.interceptors.request.use(
   (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('authToken');
-    if (token && config.headers) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    // Add auth token if available (admin token)
+    const adminToken = localStorage.getItem('authToken');
+    if (adminToken && config.headers) {
+      config.headers['Authorization'] = `Bearer ${adminToken}`;
     }
+    
+    // Add student token if available
+    const studentToken = localStorage.getItem('studentToken');
+    if (studentToken && config.headers) {
+      config.headers['Student-Authorization'] = `Bearer ${studentToken}`;
+    }
+    
     return config;
   },
   (error) => {

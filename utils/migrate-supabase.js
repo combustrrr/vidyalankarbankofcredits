@@ -27,7 +27,8 @@ function isPsqlInstalled() {
 const migrationFiles = [
   'create-courses-table.sql',
   'setup-program-structure.sql',
-  'update-courses-table.sql'
+  'update-courses-table.sql',
+  'create-students-table.sql'
 ];
 
 // Function to execute SQL file using psql

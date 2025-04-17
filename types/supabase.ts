@@ -14,6 +14,7 @@ export interface Database {
         Row: {
           id: string
           vertical: string
+          basket: string
           semester: number
           recommended_credits: number
           created_at: string
@@ -21,6 +22,7 @@ export interface Database {
         Insert: {
           id?: string
           vertical: string
+          basket: string
           semester: number
           recommended_credits: number
           created_at?: string
@@ -28,6 +30,7 @@ export interface Database {
         Update: {
           id?: string
           vertical?: string
+          basket?: string
           semester?: number
           recommended_credits?: number
           created_at?: string

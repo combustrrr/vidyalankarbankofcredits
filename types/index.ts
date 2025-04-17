@@ -103,3 +103,35 @@ export interface FormState {
   isSuccess: boolean;
   error: string | null;
 }
+
+// Student Types
+export interface Student {
+  id: string;
+  roll_number: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  legal_name: string;
+  degree: string;
+  branch: string;
+  division: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StudentRegistrationData {
+  roll_number: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  legal_name: string;
+  degree: string;
+  branch: string;
+  division: string;
+}
+
+export interface StudentLoginData {
+  roll_number: string;
+  password: string;
+}

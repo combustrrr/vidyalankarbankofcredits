@@ -13,6 +13,7 @@ const path = require('path');
 const { spawn, execSync } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
 const readline = require('readline');
+const { Pool } = require('pg');
 
 // Check environment variables
 console.log('🔍 Checking environment variables...');
@@ -37,6 +38,48 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Create a PostgreSQL connection pool for direct SQL execution
+let pool = null;
+try {
+  if (process.env.SUPABASE_DB_HOST && 
+      process.env.SUPABASE_DB_USER && 
+      process.env.SUPABASE_DB_PASSWORD) {
+    pool = new Pool({
+      host: process.env.SUPABASE_DB_HOST,
+      port: 5432,
+      user: process.env.SUPABASE_DB_USER,
+      password: process.env.SUPABASE_DB_PASSWORD,
+      database: 'postgres',
+      ssl: { rejectUnauthorized: false } // Required for Supabase connections
+    });
+    console.log('✅ PostgreSQL connection pool created successfully');
+  } else {
+    console.log('⚠️ Some database connection parameters are missing. Direct SQL execution will be unavailable.');
+  }
+} catch (error) {
+  console.error('❌ Failed to create PostgreSQL connection pool:', error.message);
+}
+
+// Function to execute SQL directly using PostgreSQL connection
+async function executeSqlDirect(sql) {
+  if (!pool) {
+    throw new Error('PostgreSQL connection pool is not available. Cannot execute SQL directly.');
+  }
+  
+  const client = await pool.connect();
+  try {
+    console.log('🔄 Executing SQL directly through PostgreSQL connection...');
+    await client.query(sql);
+    console.log('✅ SQL executed successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to execute SQL:', error.message);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 // Helper function to check if psql is installed
 function isPsqlInstalled() {
@@ -105,6 +148,38 @@ function createPrompt(question) {
   });
 }
 
+// Read SQL file and execute it directly or prompt for manual execution
+async function executeSqlFileOrPrompt(filePath, tableName) {
+  const sqlContent = fs.readFileSync(filePath, 'utf8');
+  
+  if (pool) {
+    try {
+      // Try to execute SQL directly
+      await executeSqlDirect(sqlContent);
+      console.log(`✅ ${tableName} table created or updated successfully.`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to execute SQL for ${tableName} table:`, error.message);
+      console.log('Falling back to manual execution...');
+    }
+  }
+  
+  // If direct execution fails or pool is not available, fall back to manual mode
+  console.log(`⚠️ Creating ${tableName} table...`);
+  console.log('Please run this SQL in the Supabase SQL editor:');
+  console.log(sqlContent);
+  
+  const answer = await createPrompt(`Have you created the ${tableName} table in the Supabase dashboard? (yes/no): `);
+  
+  if (answer !== 'yes') {
+    console.error(`❌ Please create the ${tableName} table before continuing.`);
+    return false;
+  }
+  
+  console.log(`✅ ${tableName} table created successfully.`);
+  return true;
+}
+
 // Database Migration Tasks
 const migrationTasks = {
   async createCoursesTable() {
@@ -117,151 +192,49 @@ const migrationTasks = {
       .limit(1);
     
     if (tableCheckError) {
-      console.log('⚠️ Creating courses table...');
-      console.log('Please run this SQL in the Supabase SQL editor:');
-      
-      const sqlContent = fs.readFileSync(path.join(__dirname, '../create-courses-table.sql'), 'utf8');
-      console.log(sqlContent);
-      
-      const answer = await createPrompt('Have you created the courses table in the Supabase dashboard? (yes/no): ');
-      
-      if (answer !== 'yes') {
-        console.error('❌ Please create the table before continuing.');
-        return false;
-      }
-      
-      console.log('✅ Courses table created successfully.');
+      // Table doesn't exist, create it
+      return executeSqlFileOrPrompt(path.join(__dirname, '../create-courses-table.sql'), 'courses');
     } else {
       console.log('✅ Courses table already exists.');
+      return true;
     }
+  },
+  
+  async createStudentsTable() {
+    console.log('📊 Setting up students table...');
     
-    return true;
+    // Check if the table exists
+    const { data: existingTable, error: tableCheckError } = await supabase
+      .from('students')
+      .select('id')
+      .limit(1);
+    
+    if (tableCheckError) {
+      // Table doesn't exist, create it
+      return executeSqlFileOrPrompt(path.join(__dirname, '../create-students-table.sql'), 'students');
+    } else {
+      console.log('✅ Students table already exists.');
+      return true;
+    }
   },
   
   async setupProgramStructure() {
     console.log('📊 Setting up program structure...');
     
-    // Check if program_structure table exists
+    // Check if program_structure table exists with basket column
     const { data: existingTable, error: tableCheckError } = await supabase
       .from('program_structure')
-      .select('id')
+      .select('id, basket')
       .limit(1);
     
-    if (tableCheckError) {
-      console.log('⚠️ Creating program structure table...');
-      console.log('Please run this SQL in the Supabase SQL editor:');
-      
-      const sqlContent = fs.readFileSync(path.join(__dirname, '../setup-program-structure.sql'), 'utf8');
-      console.log(sqlContent);
-      
-      const answer = await createPrompt('Have you created the program_structure table in the Supabase dashboard? (yes/no): ');
-      
-      if (answer !== 'yes') {
-        console.error('❌ Please create the table before continuing.');
-        return false;
-      }
+    if (tableCheckError || (existingTable && existingTable.length > 0 && !existingTable[0].basket)) {
+      // Table doesn't exist or doesn't have basket column, create/recreate it
+      console.log('⚠️ Program structure table needs to be updated with basket column...');
+      return executeSqlFileOrPrompt(path.join(__dirname, '../setup-program-structure.sql'), 'program_structure');
     } else {
-      console.log('✅ Program structure table already exists.');
+      console.log('✅ Program structure table already exists with basket column.');
+      return true;
     }
-    
-    // Insert or update program structure data
-    console.log('📊 Inserting program structure data...');
-    
-    // Define program structure data from config.ts
-    const verticals = [
-      // BSC/ ESC Vertical
-      { vertical: 'BSC/ ESC', semester: 1, recommended_credits: 12 },
-      { vertical: 'BSC/ ESC', semester: 2, recommended_credits: 9 },
-      { vertical: 'BSC/ ESC', semester: 3, recommended_credits: 3 },
-      { vertical: 'BSC/ ESC', semester: 4, recommended_credits: 3 },
-      { vertical: 'BSC/ ESC', semester: 5, recommended_credits: 0 },
-      { vertical: 'BSC/ ESC', semester: 6, recommended_credits: 0 },
-      { vertical: 'BSC/ ESC', semester: 7, recommended_credits: 0 },
-      { vertical: 'BSC/ ESC', semester: 8, recommended_credits: 0 },
-      
-      // Program Courses Vertical
-      { vertical: 'Program Courses', semester: 1, recommended_credits: 0 },
-      { vertical: 'Program Courses', semester: 2, recommended_credits: 0 },
-      { vertical: 'Program Courses', semester: 3, recommended_credits: 9 },
-      { vertical: 'Program Courses', semester: 4, recommended_credits: 12 },
-      { vertical: 'Program Courses', semester: 5, recommended_credits: 15 },
-      { vertical: 'Program Courses', semester: 6, recommended_credits: 15 },
-      { vertical: 'Program Courses', semester: 7, recommended_credits: 12 },
-      { vertical: 'Program Courses', semester: 8, recommended_credits: 0 },
-      
-      // Multidisciplinary Courses Vertical
-      { vertical: 'Multidisciplinary Courses', semester: 1, recommended_credits: 0 },
-      { vertical: 'Multidisciplinary Courses', semester: 2, recommended_credits: 2 },
-      { vertical: 'Multidisciplinary Courses', semester: 3, recommended_credits: 3 },
-      { vertical: 'Multidisciplinary Courses', semester: 4, recommended_credits: 3 },
-      { vertical: 'Multidisciplinary Courses', semester: 5, recommended_credits: 6 },
-      { vertical: 'Multidisciplinary Courses', semester: 6, recommended_credits: 3 },
-      { vertical: 'Multidisciplinary Courses', semester: 7, recommended_credits: 5 },
-      { vertical: 'Multidisciplinary Courses', semester: 8, recommended_credits: 0 },
-      
-      // Skill Courses Vertical
-      { vertical: 'Skill Courses', semester: 1, recommended_credits: 3 },
-      { vertical: 'Skill Courses', semester: 2, recommended_credits: 3 },
-      { vertical: 'Skill Courses', semester: 3, recommended_credits: 2 },
-      { vertical: 'Skill Courses', semester: 4, recommended_credits: 0 },
-      { vertical: 'Skill Courses', semester: 5, recommended_credits: 0 },
-      { vertical: 'Skill Courses', semester: 6, recommended_credits: 0 },
-      { vertical: 'Skill Courses', semester: 7, recommended_credits: 0 },
-      { vertical: 'Skill Courses', semester: 8, recommended_credits: 0 },
-      
-      // HSSM Vertical
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 1, recommended_credits: 6 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 2, recommended_credits: 3 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 3, recommended_credits: 0 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 4, recommended_credits: 0 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 5, recommended_credits: 3 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 6, recommended_credits: 3 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 7, recommended_credits: 3 },
-      { vertical: 'Humanities Social Science and Management (HSSM)', semester: 8, recommended_credits: 3 },
-      
-      // Experiential Learning Courses Vertical
-      { vertical: 'Experiential Learning Courses', semester: 1, recommended_credits: 0 },
-      { vertical: 'Experiential Learning Courses', semester: 2, recommended_credits: 0 },
-      { vertical: 'Experiential Learning Courses', semester: 3, recommended_credits: 0 },
-      { vertical: 'Experiential Learning Courses', semester: 4, recommended_credits: 0 },
-      { vertical: 'Experiential Learning Courses', semester: 5, recommended_credits: 2 },
-      { vertical: 'Experiential Learning Courses', semester: 6, recommended_credits: 4 },
-      { vertical: 'Experiential Learning Courses', semester: 7, recommended_credits: 2 },
-      { vertical: 'Experiential Learning Courses', semester: 8, recommended_credits: 9 },
-      
-      // Liberal Learning Courses Vertical
-      { vertical: 'Liberal Learning Courses', semester: 1, recommended_credits: 0 },
-      { vertical: 'Liberal Learning Courses', semester: 2, recommended_credits: 2 },
-      { vertical: 'Liberal Learning Courses', semester: 3, recommended_credits: 2 },
-      { vertical: 'Liberal Learning Courses', semester: 4, recommended_credits: 0 },
-      { vertical: 'Liberal Learning Courses', semester: 5, recommended_credits: 0 },
-      { vertical: 'Liberal Learning Courses', semester: 6, recommended_credits: 0 },
-      { vertical: 'Liberal Learning Courses', semester: 7, recommended_credits: 0 },
-      { vertical: 'Liberal Learning Courses', semester: 8, recommended_credits: 0 }
-    ];
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    // Insert each structure with upsert operation
-    for (const structure of verticals) {
-      const { error } = await supabase
-        .from('program_structure')
-        .upsert([structure], {
-          onConflict: 'vertical,semester',
-          ignoreDuplicates: false
-        });
-      
-      if (error) {
-        console.error(`❌ Error inserting program structure for ${structure.vertical} semester ${structure.semester}:`, error.message);
-        errorCount++;
-      } else {
-        successCount++;
-      }
-    }
-    
-    console.log(`✅ Program structure data updated: ${successCount} successful, ${errorCount} failed.`);
-    return errorCount === 0;
   },
   
   async updateCourseStructureIds() {
@@ -271,7 +244,7 @@ const migrationTasks = {
       // Get all courses without a structure_id
       const { data: courses, error: coursesError } = await supabase
         .from('courses')
-        .select('id, vertical, semester')
+        .select('id, vertical, basket, semester')
         .is('structure_id', null)
         .limit(500);
       
@@ -290,7 +263,7 @@ const migrationTasks = {
       // Get all program structures
       const { data: structures, error: structuresError } = await supabase
         .from('program_structure')
-        .select('id, vertical, semester');
+        .select('id, vertical, basket, semester');
       
       if (structuresError) {
         console.error('❌ Error fetching program structures:', structuresError.message);
@@ -300,7 +273,7 @@ const migrationTasks = {
       // Create a map for easy lookup
       const structureMap = {};
       structures.forEach(s => {
-        const key = `${s.vertical}-${s.semester}`;
+        const key = `${s.vertical}-${s.basket}-${s.semester}`;
         structureMap[key] = s.id;
       });
       
@@ -309,7 +282,7 @@ const migrationTasks = {
       let failedCount = 0;
       
       for (const course of courses) {
-        const key = `${course.vertical}-${course.semester}`;
+        const key = `${course.vertical}-${course.basket}-${course.semester}`;
         const structureId = structureMap[key];
         
         if (structureId) {
@@ -325,7 +298,7 @@ const migrationTasks = {
             updatedCount++;
           }
         } else {
-          console.warn(`⚠️ No matching program structure found for vertical: ${course.vertical}, semester: ${course.semester}`);
+          console.warn(`⚠️ No matching program structure found for vertical: ${course.vertical}, basket: ${course.basket}, semester: ${course.semester}`);
           failedCount++;
         }
       }
@@ -335,7 +308,7 @@ const migrationTasks = {
       // Verify the update
       const { data: verifyData, error: queryError } = await supabase
         .from('courses')
-        .select('id, course_code, vertical, semester, structure_id')
+        .select('id, course_code, vertical, basket, semester, structure_id')
         .not('structure_id', 'is', null)
         .limit(5);
       
@@ -347,6 +320,7 @@ const migrationTasks = {
           id: c.id,
           code: c.course_code,
           vertical: c.vertical,
+          basket: c.basket,
           semester: c.semester,
           structure_id: c.structure_id
         })));
@@ -356,6 +330,24 @@ const migrationTasks = {
     } catch (err) {
       console.error('❌ Unexpected error:', err.message);
       return false;
+    }
+  },
+
+  async createBasketCreditsView() {
+    console.log('📊 Setting up basket credits view...');
+    
+    // Try to query the view to see if it exists
+    const { data: viewData, error: viewError } = await supabase
+      .from('basket_credits')
+      .select('vertical, basket')
+      .limit(1);
+    
+    if (viewError) {
+      // View doesn't exist, create it
+      return executeSqlFileOrPrompt(path.join(__dirname, '../create-basket-credits-view.sql'), 'basket_credits view');
+    } else {
+      console.log('✅ Basket credits view already exists.');
+      return true;
     }
   }
 };
@@ -375,6 +367,13 @@ async function runMigrations({ interactive = true, forceContinue = false } = {})
       throw new Error('Failed to create courses table');
     }
     
+    // Create students table
+    if (await migrationTasks.createStudentsTable() || forceContinue) {
+      tasksSucceeded++;
+    } else if (!forceContinue) {
+      throw new Error('Failed to create students table');
+    }
+    
     // Setup program structure
     if (await migrationTasks.setupProgramStructure() || forceContinue) {
       tasksSucceeded++;
@@ -387,6 +386,13 @@ async function runMigrations({ interactive = true, forceContinue = false } = {})
       tasksSucceeded++;
     } else if (!forceContinue) {
       throw new Error('Failed to update course structure IDs');
+    }
+
+    // Create basket credits view
+    if (await migrationTasks.createBasketCreditsView() || forceContinue) {
+      tasksSucceeded++;
+    } else if (!forceContinue) {
+      throw new Error('Failed to create basket credits view');
     }
     
     console.log(`✅ Migration completed: ${tasksSucceeded}/${totalTasks} tasks successful.`);
