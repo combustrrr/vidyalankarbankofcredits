@@ -108,6 +108,44 @@ export const courseApi = {
     } catch (error) {
       return handleApiError(error as AxiosError);
     }
+  },
+
+  // Fetch courses for a specific student
+  getCoursesForStudent: async (studentId: string): Promise<ApiResponse<Course[]>> => {
+    try {
+      const response = await api.get(`/api/students/${studentId}/courses`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  },
+
+  // Insert a row into completed_courses when a student marks 'Yes' on a course
+  markCourseAsCompleted: async (studentId: string, courseId: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await api.patch('/api/courses', {
+        studentId,
+        courseId,
+        completed: true
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
+  },
+
+  // Delete the corresponding record when a student deselects a course
+  unmarkCourseAsCompleted: async (studentId: string, courseId: string): Promise<ApiResponse<void>> => {
+    try {
+      const response = await api.patch('/api/courses', {
+        studentId,
+        courseId,
+        completed: false
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error as AxiosError);
+    }
   }
 };
 

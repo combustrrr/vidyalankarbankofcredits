@@ -25,7 +25,8 @@ export const supabaseConfig = {
   tables: {
     courses: 'courses',
     programStructure: 'program_structure',
-    students: 'students' // P0283
+    students: 'students',
+    completedCourses: 'completed_courses' // Pbe52
   },
   
   // Functions to generate fully qualified table names

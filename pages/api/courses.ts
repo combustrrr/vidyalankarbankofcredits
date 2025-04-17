@@ -89,9 +89,74 @@ export default async function handler(
         await supabaseCourseApi.delete(id);
         return res.status(200).json({ success: true });
       }
+
+      case 'PATCH': {
+        // Handle course completion status update
+        const { studentId, courseId, completed } = req.body;
+
+        if (!studentId || !courseId || typeof completed !== 'boolean') {
+          return res.status(400).json({
+            success: false,
+            error: 'Student ID, Course ID, and completion status are required'
+          });
+        }
+
+        if (completed) {
+          // Insert a row into completed_courses
+          const { data: course, error: courseError } = await supabase
+            .from('courses')
+            .select('credits, semester')
+            .eq('id', courseId)
+            .single();
+
+          if (courseError) {
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to fetch course details'
+            });
+          }
+
+          const { credits, semester } = course;
+
+          const { error: insertError } = await supabase
+            .from('completed_courses')
+            .insert({
+              student_id: studentId,
+              course_id: courseId,
+              semester,
+              credit_awarded: credits,
+              completed_at: new Date().toISOString()
+            });
+
+          if (insertError) {
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to insert completed course'
+            });
+          }
+
+          return res.status(200).json({ success: true });
+        } else {
+          // Delete the corresponding record from completed_courses
+          const { error: deleteError } = await supabase
+            .from('completed_courses')
+            .delete()
+            .eq('student_id', studentId)
+            .eq('course_id', courseId);
+
+          if (deleteError) {
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to delete completed course'
+            });
+          }
+
+          return res.status(200).json({ success: true });
+        }
+      }
       
       default:
-        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
         return res.status(405).json({ 
           success: false, 
           error: `Method ${method} Not Allowed` 

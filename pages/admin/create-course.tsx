@@ -11,6 +11,7 @@ import {
   getRecommendedCredits,
   canAdminCreateVertical 
 } from '../../config';
+import { supabase } from '../../utils/supabase'; // Import supabase client
 
 const CreateCourse: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -223,20 +224,27 @@ const CreateCourse: React.FC = () => {
     
     try {
       // Use Supabase to create a new course - the structure_id will be linked automatically
-      await courseApi.create({
-        course_code: formData.courseCode,
-        title: formData.courseTitle,
-        type: formData.courseType as 'Theory' | 'Practical',
-        credits: parseInt(formData.creditValue, 10),
-        semester: parseInt(formData.semester, 10),
-        degree: formData.degree,
-        branch: formData.branch,
-        vertical: formData.vertical,
-        basket: formData.basket
-      });
-      
+      const { data: createdCourse, error: createError } = await supabase
+        .from('courses')
+        .insert({
+          course_code: formData.courseCode,
+          title: formData.courseTitle,
+          type: formData.courseType,
+          credits: parseInt(formData.creditValue, 10),
+          semester: parseInt(formData.semester, 10),
+          degree: formData.degree,
+          branch: formData.branch,
+          vertical: formData.vertical,
+          basket: formData.basket
+        })
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
       setConfirmation('Course created successfully');
-      
+
       // Reset form
       setFormData({
         courseCode: '',
@@ -249,7 +257,7 @@ const CreateCourse: React.FC = () => {
         vertical: '',
         basket: ''
       });
-      
+
       // Redirect after a delay
       setTimeout(() => {
         router.push('/admin/dashboard');

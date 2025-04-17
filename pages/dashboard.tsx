@@ -1,10 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useStudentAuth } from '../context/StudentAuthContext';
+import { courseApi } from '../utils/api';
+import { Course } from '../types';
 
 const Dashboard: React.FC = () => {
   const router = useRouter();
   const { isStudentAuthenticated, student, logout } = useStudentAuth();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
 
   // Protect this route - redirect to login page if not authenticated
   useEffect(() => {
@@ -12,12 +16,39 @@ const Dashboard: React.FC = () => {
       router.replace('/');
     } else if (student && student.semester === null) {
       router.replace('/select-semester');
+    } else if (student) {
+      setSelectedSemester(student.semester);
     }
   }, [isStudentAuthenticated, student, router]);
+
+  useEffect(() => {
+    if (selectedSemester !== null) {
+      fetchCourses(selectedSemester);
+    }
+  }, [selectedSemester]);
+
+  const fetchCourses = async (semester: number) => {
+    try {
+      const response = await courseApi.getAll({ semester });
+      if (response.success) {
+        setCourses(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    }
+  };
 
   const handleLogout = () => {
     logout();
     router.push('/');
+  };
+
+  const handleCourseCompletionChange = (courseId: string, completed: boolean) => {
+    setCourses((prevCourses) =>
+      prevCourses.map((course) =>
+        course.id === courseId ? { ...course, completed } : course
+      )
+    );
   };
 
   // Function to compute academic year based on semester value
@@ -124,6 +155,44 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Your Academic Progress</h2>
+          {Array.from({ length: selectedSemester || 0 }, (_, i) => i + 1).map((semester) => (
+            <div key={semester} className="mb-4">
+              <h3 className="text-lg font-semibold mb-2">Semester {semester}</h3>
+              {courses
+                .filter((course) => course.semester === semester)
+                .map((course) => (
+                  <div key={course.id} className="mb-2">
+                    <p className="font-medium">{course.course_code} - {course.title}</p>
+                    <div className="flex items-center">
+                      <label className="mr-4">
+                        <input
+                          type="radio"
+                          name={`course-${course.id}`}
+                          value="yes"
+                          checked={course.completed === true}
+                          onChange={() => handleCourseCompletionChange(course.id, true)}
+                        />
+                        Yes, I have completed this course
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name={`course-${course.id}`}
+                          value="no"
+                          checked={course.completed === false}
+                          onChange={() => handleCourseCompletionChange(course.id, false)}
+                        />
+                        No, I have not completed this course
+                      </label>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>

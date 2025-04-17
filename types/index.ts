@@ -25,6 +25,7 @@ export interface Course {
   basket: string;
   structure_id?: string | null;
   created_at: string;
+  completed?: boolean;
 }
 
 export interface CourseCreationData {
@@ -134,4 +135,14 @@ export interface StudentRegistrationData {
 export interface StudentLoginData {
   roll_number: string;
   password: string;
+}
+
+// Completed Courses Types
+export interface CompletedCourse {
+  id: string;
+  student_id: string;
+  course_id: string;
+  semester: number;
+  credit_awarded: number;
+  completed_at: string;
 }
