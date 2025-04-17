@@ -27,3 +27,20 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     },
   },
 });
+
+// Add Supabase RLS policy to prevent students from updating their semester once it's set
+const addRlsPolicy = async () => {
+  const { error } = await supabase.rpc('add_rls_policy', {
+    table_name: 'students',
+    policy_name: 'prevent_student_semester_update',
+    definition: 'auth.uid() = id AND semester IS NULL'
+  });
+
+  if (error) {
+    console.error('Error adding RLS policy:', error);
+  } else {
+    console.log('RLS policy added successfully');
+  }
+};
+
+addRlsPolicy();

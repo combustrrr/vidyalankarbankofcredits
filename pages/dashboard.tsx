@@ -10,12 +10,24 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!isStudentAuthenticated) {
       router.replace('/');
+    } else if (student && student.semester === null) {
+      router.replace('/select-semester');
     }
-  }, [isStudentAuthenticated, router]);
+  }, [isStudentAuthenticated, student, router]);
 
   const handleLogout = () => {
     logout();
     router.push('/');
+  };
+
+  // Function to compute academic year based on semester value
+  const computeAcademicYear = (semester: number | null) => {
+    if (semester === null) return 'Unknown';
+    if (semester >= 1 && semester <= 2) return '1st Year';
+    if (semester >= 3 && semester <= 4) return '2nd Year';
+    if (semester >= 5 && semester <= 6) return '3rd Year';
+    if (semester >= 7 && semester <= 8) return '4th Year';
+    return 'Unknown';
   };
 
   // Don't render anything until we're sure the user is authenticated
@@ -75,6 +87,20 @@ const Dashboard: React.FC = () => {
             <div>
               <p className="text-gray-600">Division:</p>
               <p className="font-medium">{student.division}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Semester:</p>
+              <p className="font-medium">{student.semester}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-gray-600">Academic Year:</p>
+              <p className="font-medium">{computeAcademicYear(student.semester)}</p>
             </div>
           </div>
         </div>

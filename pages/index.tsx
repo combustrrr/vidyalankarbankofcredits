@@ -41,8 +41,13 @@ const Home: React.FC = () => {
       setIsStudentAuthenticated(true);
       setStudent(response.student);
       
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Check if semester is null and redirect to /select-semester
+      if (response.student.semester === null) {
+        router.push('/select-semester');
+      } else {
+        // Redirect to dashboard
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to login');
     } finally {

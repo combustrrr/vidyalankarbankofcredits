@@ -64,6 +64,10 @@ const AdminDashboard: React.FC = () => {
     router.push('/admin/manage-courses');
   };
 
+  const handleManageStudentsClick = () => {
+    router.push('/admin/students');
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/admin-auth');
@@ -91,6 +95,12 @@ const AdminDashboard: React.FC = () => {
               className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition duration-300"
             >
               Manage Courses
+            </button>
+            <button
+              onClick={handleManageStudentsClick}
+              className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300"
+            >
+              Manage Students
             </button>
             <button
               onClick={handleLogout}

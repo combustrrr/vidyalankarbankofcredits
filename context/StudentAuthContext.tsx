@@ -9,6 +9,7 @@ interface Student {
   division: string;
   degree: string;
   branch: string;
+  semester: number | null; // Added semester field
 }
 
 interface AuthState {
@@ -37,6 +38,8 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
     token: null
   });
 
+  const [redirectToSelectSemester, setRedirectToSelectSemester] = useState(false); // Added state variable
+
   // Initialize auth state from localStorage when the provider mounts
   useEffect(() => {
     const storedAuthState = localStorage.getItem('studentAuth');
@@ -50,6 +53,10 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
           student: parsedAuthState,
           token: storedToken
         });
+
+        if (parsedAuthState.semester === null) {
+          setRedirectToSelectSemester(true);
+        }
       } catch (error) {
         // If there's an error parsing the stored state, clear it
         localStorage.removeItem('studentAuth');
@@ -65,6 +72,13 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
       localStorage.setItem('studentToken', authState.token);
     }
   }, [authState]);
+
+  // Handle redirection to /select-semester if needed
+  useEffect(() => {
+    if (redirectToSelectSemester) {
+      window.location.href = '/select-semester';
+    }
+  }, [redirectToSelectSemester]);
 
   // Setter functions
   const setIsStudentAuthenticated = (isAuthenticated: boolean) => {
@@ -92,6 +106,13 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
       token: null
     });
   };
+
+  // Prevent students from updating their semester once it's set
+  useEffect(() => {
+    if (authState.student && authState.student.semester !== null) {
+      setStudent(prev => ({ ...prev, semester: authState.student.semester }));
+    }
+  }, [authState.student]);
 
   return (
     <StudentAuthContext.Provider value={{ 
