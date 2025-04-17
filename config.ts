@@ -497,3 +497,10 @@ export const getBasketRecommendedCredits = (basketName: string, semester: number
 export const canAdminCreateVertical = (): boolean => {
   return true;
 };
+
+/**
+ * Validate if a course's semester is not greater than the student's selected semester
+ */
+export const validateCourseSemester = (courseSemester: number, studentSemester: number): boolean => {
+  return courseSemester <= studentSemester;
+};

@@ -18,4 +18,7 @@ router.get('/vertical/:vertical/semester/:semester/credits',
   courseController.getRecommendedCreditsForVertical
 );
 
+// New route for progress report
+router.get('/progress-report', courseController.getStudentProgressReport);
+
 export default router;

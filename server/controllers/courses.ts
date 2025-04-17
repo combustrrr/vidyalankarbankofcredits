@@ -10,7 +10,8 @@ import {
   CourseCreationData,
   CourseFilterOptions,
   PaginationOptions,
-  PaginatedResult
+  PaginatedResult,
+  CompletedCourse
 } from '../../types';
 import { createApiError } from '../middleware/errorHandler';
 import { programStructure, getRecommendedCredits } from '../../config';
@@ -365,6 +366,79 @@ export const getRecommendedCreditsForVertical = async (
         recommended_credits: recommendedCredits
       },
       source: 'configuration' // Indicate this came from config, not database
+    });
+  } catch (err: any) {
+    next(createApiError(err.message, 500));
+  }
+};
+
+/**
+ * Get student progress report
+ */
+export const getStudentProgressReport = async (
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+) => {
+  try {
+    const { studentId } = req.query;
+
+    if (!studentId) {
+      return next(createApiError(
+        'Student ID is required',
+        400,
+        'VALIDATION_ERROR'
+      ));
+    }
+
+    // Fetch completed courses for the student
+    const { data: completedCourses, error: completedCoursesError } = await supabase
+      .from('completed_courses')
+      .select('*, courses(*)')
+      .eq('student_id', studentId);
+
+    if (completedCoursesError) {
+      return next(createApiError(completedCoursesError.message, 500, 'DATABASE_ERROR'));
+    }
+
+    // Organize completed courses by semester
+    const progressReport = completedCourses.reduce((report: any, completedCourse: CompletedCourse) => {
+      const { semester, courses } = completedCourse;
+      if (!report[semester]) {
+        report[semester] = [];
+      }
+      report[semester].push({
+        courseCode: courses.course_code,
+        courseName: courses.title,
+        basket: courses.basket,
+        creditsEarned: completedCourse.credit_awarded,
+        completionDate: completedCourse.completed_at
+      });
+      return report;
+    }, {});
+
+    // Calculate total credits completed
+    const totalCreditsCompleted = completedCourses.reduce((total: number, completedCourse: CompletedCourse) => {
+      return total + completedCourse.credit_awarded;
+    }, 0);
+
+    // Calculate basket-wise breakdown
+    const basketWiseBreakdown = completedCourses.reduce((breakdown: any, completedCourse: CompletedCourse) => {
+      const { basket, credit_awarded } = completedCourse.courses;
+      if (!breakdown[basket]) {
+        breakdown[basket] = 0;
+      }
+      breakdown[basket] += credit_awarded;
+      return breakdown;
+    }, {});
+
+    res.status(200).json({
+      success: true,
+      data: {
+        progressReport,
+        totalCreditsCompleted,
+        basketWiseBreakdown
+      }
     });
   } catch (err: any) {
     next(createApiError(err.message, 500));

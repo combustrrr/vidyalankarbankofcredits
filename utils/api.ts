@@ -241,3 +241,20 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Add a new function to fetch the total credits and basket credits for a student
+export const getStudentCredits = async (studentId: string): Promise<{
+  totalCredits: number;
+  basketCredits: Array<{
+    basket: string;
+    completedCredits: number;
+    totalCredits: number;
+  }>;
+}> => {
+  try {
+    const response = await api.get(`/api/students/${studentId}/credits`);
+    return response.data;
+  } catch (error) {
+    return handleApiError(error as AxiosError);
+  }
+};

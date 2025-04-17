@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useStudentAuth } from '../context/StudentAuthContext';
-import { courseApi } from '../utils/api';
+import { courseApi, adminApi } from '../utils/api';
 import { Course } from '../types';
 
 const Dashboard: React.FC = () => {
@@ -9,6 +9,8 @@ const Dashboard: React.FC = () => {
   const { isStudentAuthenticated, student, logout } = useStudentAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
+  const [totalCredits, setTotalCredits] = useState<number>(0); // P0316
+  const [basketCredits, setBasketCredits] = useState<Array<{ vertical: string; basket: string; total_credits: number }>>([]); // P9f89
 
   // Protect this route - redirect to login page if not authenticated
   useEffect(() => {
@@ -37,6 +39,20 @@ const Dashboard: React.FC = () => {
       console.error('Error fetching courses:', error);
     }
   };
+
+  const fetchCredits = async () => {
+    try {
+      const response = await adminApi.getBasketCredits();
+      setTotalCredits(response.totalCredits);
+      setBasketCredits(response.basketCredits);
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCredits();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -155,6 +171,27 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Total Credits Completed</h2>
+          <p className="text-gray-600 mb-4">{totalCredits} credits completed</p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Credits Breakdown by Basket</h2>
+          {basketCredits.map((basketCredit, index) => (
+            <div key={index} className="mb-4">
+              <h3 className="text-lg font-semibold mb-2">{basketCredit.vertical} - {basketCredit.basket}</h3>
+              <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+                <div
+                  className="bg-indigo-600 h-4 rounded-full"
+                  style={{ width: `${(basketCredit.total_credits / totalCredits) * 100}%` }}
+                ></div>
+              </div>
+              <p className="text-gray-600">{basketCredit.total_credits} / {totalCredits} credits completed</p>
+            </div>
+          ))}
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6">

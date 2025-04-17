@@ -207,6 +207,11 @@ const CreateCourse: React.FC = () => {
     if (formData.creditValue && !/^\d+$/.test(formData.creditValue)) {
       newErrors.creditValue = 'Credit Value must be a number';
     }
+
+    // Validate that the course's semester is not greater than the student's selected semester
+    if (formData.semester && parseInt(formData.semester, 10) > 8) {
+      newErrors.semester = 'Course semester cannot be greater than the student\'s selected semester';
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
