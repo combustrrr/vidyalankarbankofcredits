@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "next dev",
-    "dev:server": "cross-env SERVER_PORT=4000 nodemon --exec ts-node --project tsconfig.server.json server/index.ts",
+    "dev:server": "cross-env SERVER_PORT=4000 nodemon --exec ts-node --project tsconfig.server.json --inspect=9230 server/index.ts",
     "build": "next build && tsc --project tsconfig.server.json",
     "build:server": "tsc --project tsconfig.server.json",
     "start": "cross-env NODE_ENV=production concurrently \"next start\" \"cross-env SERVER_PORT=4000 node dist/server/index.js\"",
     "start:server": "cross-env SERVER_PORT=4000 node dist/server/index.js",
     "start:client": "next start",
-    "prepare": "mkdir -p node_modules"
+    "prepare": "mkdir -p node_modules",
+    "migrate:supabase": "node utils/migrate-supabase.js",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "cleanup-ports": "node utils/kill-debug-ports.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "axios": "^1.5.0",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",

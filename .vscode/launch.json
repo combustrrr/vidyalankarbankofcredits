@@ -9,6 +9,7 @@
       "program": "${workspaceFolder}/server/index.ts",
       "runtimeArgs": ["-r", "ts-node/register", "--project", "tsconfig.server.json"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "port": 9230, // Custom port for server debugging
       "env": {
         "SERVER_PORT": "4000",
         "NODE_ENV": "development"
@@ -22,7 +23,8 @@
       "runtimeArgs": ["run", "dev:client"],
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/.next/**/*.js"],
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "port": 9231 // Custom port for Next.js debugging
     },
     {
       "type": "node",
@@ -31,7 +33,21 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "skipFiles": ["<node_internals>/**"],
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_OPTIONS": "--inspect=9229" // Explicit port for the full app
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run Supabase Migrations",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "migrate:supabase"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "port": 9232, // Custom port for migrations
+      "envFile": "${workspaceFolder}/.env.local"
     }
   ],
   "compounds": [

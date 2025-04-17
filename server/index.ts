@@ -30,18 +30,34 @@ app.get('/courses', (req: Request, res: Response<ApiResponse<{ courses: Course[]
 
 app.post('/courses', (req: Request, res: Response<ApiResponse<{ course: Course }>>) => {
   try {
-    const { name, description, duration } = req.body;
+    const { 
+      name, description, duration, 
+      code, title, type, credits, semester, 
+      degree, branch, vertical, basket 
+    } = req.body;
     
-    if (!name || !description || !duration) {
+    // Check for required fields
+    if (!code || !title || !type || credits === undefined || semester === undefined || 
+        !degree || !branch || !vertical || !basket) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
     
     const newCourse: Course = {
       id: Date.now().toString(),
-      name,
-      description,
-      duration,
-      createdAt: new Date().toISOString()
+      name: name || title, // Use title as name if name is not provided
+      description: description || '',
+      duration: duration || '',
+      createdAt: new Date().toISOString(),
+      // New required fields
+      code,
+      title,
+      type,
+      credits: Number(credits),
+      semester: Number(semester),
+      degree, 
+      branch,
+      vertical,
+      basket
     };
     
     courses.push(newCourse);
