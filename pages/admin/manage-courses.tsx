@@ -50,6 +50,8 @@ const ManageCourses: React.FC = () => {
     degree: '',
     branch: '',
   });
+  const [basketCredits, setBasketCredits] = useState([]);
+  const [totalCredits, setTotalCredits] = useState(0);
   
   // Use debounced filters to prevent too many queries
   const debouncedFilters = useDebounce(filters, 300);
@@ -108,14 +110,27 @@ const ManageCourses: React.FC = () => {
     }
   }, [debouncedFilters]);
 
+  const fetchBasketCredits = useCallback(async () => {
+    try {
+      const response = await fetch('/api/basket-credits');
+      const data = await response.json();
+      setBasketCredits(data.basketCredits);
+      setTotalCredits(data.totalCredits);
+    } catch (err) {
+      console.error('Error fetching basket credits:', err);
+      setError('Failed to load basket credits. Please try again.');
+    }
+  }, []);
+
   // Enhanced authentication check
   useEffect(() => {
     if (!isAdminAuthenticated) {
       router.replace('/admin-auth');
     } else {
       fetchCourses();
+      fetchBasketCredits();
     }
-  }, [isAdminAuthenticated, router, fetchCourses]);
+  }, [isAdminAuthenticated, router, fetchCourses, fetchBasketCredits]);
 
   const handleDeleteClick = (course: Course) => {
     setCourseToDelete(course);
@@ -426,6 +441,26 @@ const ManageCourses: React.FC = () => {
               )}
             </>
           )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Basket-wise Credit Totals</h2>
+          {basketCredits.length === 0 ? (
+            <p className="text-gray-500">No basket credits available.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {basketCredits.map((credit) => (
+                <div key={`${credit.vertical}-${credit.basket}`} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50 transition-colors">
+                  <h3 className="text-lg font-medium">{credit.vertical} - {credit.basket}</h3>
+                  <p className="text-gray-600 text-sm mt-1">Total Credits: {credit.total_credits}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4">
+            <h3 className="text-lg font-medium">Overall Total Credits</h3>
+            <p className="text-gray-600 text-sm mt-1">{totalCredits}</p>
+          </div>
         </div>
       </div>
 

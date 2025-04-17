@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAdminAuth } from '../../context/AdminAuthContext';
-import { courseApi } from '../../utils/api';
+import { courseApi, adminApi } from '../../utils/api';
 import { Course } from '../../types';
 
 const AdminDashboard: React.FC = () => {
@@ -10,6 +10,8 @@ const AdminDashboard: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [basketCredits, setBasketCredits] = useState([]);
+  const [totalCredits, setTotalCredits] = useState(0);
 
   // Enhanced authentication check using the updated context
   useEffect(() => {
@@ -37,6 +39,22 @@ const AdminDashboard: React.FC = () => {
       fetchCourses();
     }
   }, [isAdminAuthenticated]);
+
+  useEffect(() => {
+    // Fetch basket credits and total credits from the API
+    const fetchBasketCredits = async () => {
+      try {
+        const { basketCredits, totalCredits } = await adminApi.getBasketCredits();
+        setBasketCredits(basketCredits);
+        setTotalCredits(totalCredits);
+      } catch (err) {
+        console.error('Error fetching basket credits:', err);
+        setError('Failed to load basket credits. Please try again.');
+      }
+    };
+
+    fetchBasketCredits();
+  }, []);
 
   const handleCreateCourseClick = () => {
     router.push('/admin/create-course');
@@ -118,6 +136,26 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Basket-wise Credit Totals</h2>
+          {basketCredits.length === 0 ? (
+            <p className="text-gray-500">No basket credits available.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {basketCredits.map((credit) => (
+                <div key={`${credit.vertical}-${credit.basket}`} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50 transition-colors">
+                  <h3 className="text-lg font-medium">{credit.vertical} - {credit.basket}</h3>
+                  <p className="text-gray-600 text-sm mt-1">Total Credits: {credit.total_credits}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4">
+            <h3 className="text-lg font-medium">Overall Total Credits</h3>
+            <p className="text-gray-600 text-sm mt-1">{totalCredits}</p>
+          </div>
         </div>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
