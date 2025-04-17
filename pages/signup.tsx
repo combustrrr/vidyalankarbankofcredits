@@ -91,9 +91,17 @@ const SignUp: React.FC = () => {
 
       setSuccess('Account created successfully! Redirecting to dashboard...');
       
-      // Set authentication state
+      // Store the JWT token in localStorage
+      if (response.token) {
+        localStorage.setItem('studentToken', response.token);
+      }
+      
+      // Set authentication state with the semester property set to null for new students
       setIsStudentAuthenticated(true);
-      setStudent(response.student);
+      setStudent({
+        ...response.student,
+        semester: null // New students start with null semester until they select one
+      });
       
       // Redirect after a short delay
       setTimeout(() => {

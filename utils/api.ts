@@ -7,7 +7,7 @@ import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { clientConfig } from '../config';
 import { ApiResponse, CourseCreationData, Course, PaginatedResult, PaginationOptions, CourseFilterOptions, Student, StudentRegistrationData, StudentLoginData } from '../types';
 
-// Create axios instance with default config
+// Create axios instance with default config using clientConfig for baseURL
 const api = axios.create({
   baseURL: clientConfig.apiUrl,
   timeout: clientConfig.apiTimeout,
@@ -16,18 +16,29 @@ const api = axios.create({
   },
 });
 
-// Error handler
+// Enhanced error handler with detailed logging
 const handleApiError = (error: AxiosError): never => {
+  console.error('API Error Details:', {
+    url: error.config?.url,
+    method: error.config?.method,
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    data: error.response?.data,
+    message: error.message
+  });
+
   if (error.response) {
     // The request was made and the server responded with a status code
     // that falls out of the range of 2xx
     const data = error.response.data as any;
-    throw new Error(data?.error?.message || data?.message || 'Server error');
+    throw new Error(data?.error?.message || data?.message || `Server error: ${error.response.status}`);
   } else if (error.request) {
     // The request was made but no response was received
+    console.error('No response received:', error.request);
     throw new Error('No response from server. Please check your network connection.');
   } else {
     // Something happened in setting up the request that triggered an Error
+    console.error('Request setup error:', error.message);
     throw new Error(error.message || 'Unknown error occurred');
   }
 };
@@ -152,9 +163,13 @@ export const courseApi = {
 // Student API endpoints
 export const studentApi = {
   // Register a new student
-  register: async (data: StudentRegistrationData): Promise<ApiResponse<Student>> => {
+  register: async (data: StudentRegistrationData): Promise<{
+    message: string;
+    student: Student;
+    token: string;
+  }> => {
     try {
-      const response = await api.post('/api/students/signup', data);
+      const response = await api.post('/students/signup', data);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError);
@@ -168,7 +183,7 @@ export const studentApi = {
     token: string;
   }> => {
     try {
-      const response = await api.post('/api/students/login', data);
+      const response = await api.post('/students/login', data);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError);
@@ -178,7 +193,7 @@ export const studentApi = {
   // Get the current student's profile
   getProfile: async (rollNumber: string): Promise<ApiResponse<Student>> => {
     try {
-      const response = await api.get(`/api/students/profile?roll_number=${rollNumber}`);
+      const response = await api.get(`/students/profile?roll_number=${rollNumber}`);
       return response.data;
     } catch (error) {
       return handleApiError(error as AxiosError);

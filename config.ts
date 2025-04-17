@@ -22,7 +22,8 @@ export const serverConfig = {
 // Client-side configuration
 export const clientConfig = {
   appName: 'Vidyalankar Bank of Credits',
-  apiUrl: isProduction ? process.env.API_URL : `http://localhost:${serverConfig.port}`,
+  // Use relative API URL to make sure we're using Next.js API routes
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
   apiTimeout: 15000, // 15 seconds
   defaultPageSize: 10
 };

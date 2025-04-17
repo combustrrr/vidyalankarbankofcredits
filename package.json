@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "next dev",
-    "dev:server": "cross-env SERVER_PORT=4000 nodemon --exec \"node --inspect=9230 -r ts-node/register --project tsconfig.server.json server/index.ts\"",
+    "dev:server": "cross-env SERVER_PORT=4000 ts-node --project tsconfig.server.json server/index.ts",
     "build": "next build && tsc --project tsconfig.server.json",
     "build:server": "tsc --project tsconfig.server.json",
     "start": "cross-env NODE_ENV=production concurrently \"next start\" \"cross-env SERVER_PORT=4000 node dist/server/index.js\"",
@@ -47,7 +47,7 @@
     "@types/react-dom": "^18.2.7",
     "autoprefixer": "^10.4.15",
     "concurrently": "^8.2.1",
-    "cross-env": "^7.0.3",
+    "cross-env": "^7.0.0",
     "eslint": "^8.49.0",
     "eslint-config-next": "^13.4.19",
     "nodemon": "^3.0.1",

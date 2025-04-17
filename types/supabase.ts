@@ -37,6 +37,54 @@ export interface Database {
         }
         Relationships: []
       }
+      students: {
+        Row: {
+          id: string
+          roll_number: string
+          password_hash: string
+          first_name: string
+          last_name: string
+          full_name: string
+          legal_name: string
+          degree: string
+          branch: string
+          division: string
+          semester: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          roll_number: string
+          password_hash: string
+          first_name: string
+          last_name: string
+          full_name: string
+          legal_name: string
+          degree?: string
+          branch?: string
+          division: string
+          semester?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          roll_number?: string
+          password_hash?: string
+          first_name?: string
+          last_name?: string
+          full_name?: string
+          legal_name?: string
+          degree?: string
+          branch?: string
+          division?: string
+          semester?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           id: string
