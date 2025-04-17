@@ -10,11 +10,20 @@ const SelectSemester: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Protect this route and ensure we have student data
+  // Protect this route and ensure we have student data with ID
   useEffect(() => {
-    if (!isStudentAuthenticated || !student) {
-      router.replace('/');
-    } else if (student.semester !== null) {
+    if (!isStudentAuthenticated) {
+      router.replace('/login');
+      return;
+    }
+    
+    if (!student || !student.id) {
+      setError('Student authentication data is missing. Please try logging in again.');
+      setTimeout(() => router.replace('/login'), 3000);
+      return;
+    }
+    
+    if (student.semester !== null && student.semester !== undefined) {
       // If semester is already set, redirect to dashboard
       // This prevents users from changing their semester once set
       router.replace('/dashboard');
@@ -39,19 +48,23 @@ const SelectSemester: React.FC = () => {
     setError('');
 
     try {
-      // Ensure we have student data
+      // Ensure we have student data with ID
       if (!student || !student.id) {
         throw new Error('Student authentication data is missing. Please try logging in again.');
       }
 
       // Double check that semester hasn't been set yet
-      const { data: currentStudent } = await supabase
+      const { data: currentStudent, error: fetchError } = await supabase
         .from('students')
         .select('semester')
         .eq('id', student.id)
         .single();
 
-      if (currentStudent?.semester !== null) {
+      if (fetchError) {
+        throw new Error('Failed to verify student data. Please try again.');
+      }
+
+      if (currentStudent?.semester !== null && currentStudent?.semester !== undefined) {
         throw new Error('Semester has already been set and cannot be changed.');
       }
 
@@ -71,6 +84,8 @@ const SelectSemester: React.FC = () => {
         setStudent({ ...student, semester: data.semester });
         // Redirect to dashboard after successful update
         router.push('/dashboard');
+      } else {
+        throw new Error('Failed to update semester. No data returned.');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to update semester');

@@ -8,7 +8,7 @@ import { isDevelopment } from './environment';
 // API configuration
 export const clientConfig = {
   // API configuration
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || '/api',
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || '',
   apiTimeout: 30000,
   
   // Authentication configuration

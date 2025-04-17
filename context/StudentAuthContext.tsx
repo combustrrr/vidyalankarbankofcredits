@@ -6,10 +6,13 @@ interface Student {
   first_name: string;
   last_name: string;
   full_name: string;
+  legal_name?: string;
   division: string;
   degree: string;
   branch: string;
-  semester: number | null; // Added semester field
+  semester: number | null; // Ensure semester can be null
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface AuthState {
@@ -23,6 +26,7 @@ interface StudentAuthContextProps extends AuthState {
   setStudent: (student: Student | null) => void;
   setToken: (token: string | null) => void;
   logout: () => void;
+  checkAndRedirectLegacyAccount: () => boolean;
 }
 
 export const StudentAuthContext = createContext<StudentAuthContextProps | undefined>(undefined);
@@ -38,7 +42,7 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
     token: null
   });
 
-  const [redirectToSelectSemester, setRedirectToSelectSemester] = useState(false); // Added state variable
+  const [redirectToSelectSemester, setRedirectToSelectSemester] = useState(false);
 
   // Initialize auth state from localStorage when the provider mounts
   useEffect(() => {
@@ -48,17 +52,25 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
     if (storedAuthState && storedToken) {
       try {
         const parsedAuthState = JSON.parse(storedAuthState);
+        
+        // Ensure we have a valid student object with ID
+        if (!parsedAuthState || !parsedAuthState.id) {
+          throw new Error('Invalid student data stored');
+        }
+        
         setAuthState({
           isStudentAuthenticated: true,
           student: parsedAuthState,
           token: storedToken
         });
 
-        if (parsedAuthState.semester === null) {
+        // Handle legacy accounts that don't have semester set
+        if (parsedAuthState.semester === null || parsedAuthState.semester === undefined) {
           setRedirectToSelectSemester(true);
         }
       } catch (error) {
         // If there's an error parsing the stored state, clear it
+        console.error('Error parsing stored auth state:', error);
         localStorage.removeItem('studentAuth');
         localStorage.removeItem('studentToken');
       }
@@ -73,9 +85,9 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
     }
   }, [authState]);
 
-  // Handle redirection to /select-semester if needed
+  // Handle redirection to /select-semester if needed for legacy accounts
   useEffect(() => {
-    if (redirectToSelectSemester) {
+    if (redirectToSelectSemester && window) {
       window.location.href = '/select-semester';
     }
   }, [redirectToSelectSemester]);
@@ -96,6 +108,16 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
     setAuthState(prev => ({ ...prev, token }));
   };
 
+  // Check if the current account is a legacy account without semester
+  // Returns true if redirection is needed
+  const checkAndRedirectLegacyAccount = (): boolean => {
+    if (authState.student && (authState.student.semester === null || authState.student.semester === undefined)) {
+      setRedirectToSelectSemester(true);
+      return true;
+    }
+    return false;
+  };
+
   // Logout function to clear auth state
   const logout = () => {
     localStorage.removeItem('studentAuth');
@@ -107,20 +129,14 @@ export const StudentAuthProvider: React.FC<StudentAuthProviderProps> = ({ childr
     });
   };
 
-  // Prevent students from updating their semester once it's set
-  useEffect(() => {
-    if (authState.student && authState.student.semester !== null) {
-      setStudent(prev => ({ ...prev, semester: authState.student.semester }));
-    }
-  }, [authState.student]);
-
   return (
     <StudentAuthContext.Provider value={{ 
       ...authState,
       setIsStudentAuthenticated, 
       setStudent, 
       setToken,
-      logout 
+      logout,
+      checkAndRedirectLegacyAccount
     }}>
       {children}
     </StudentAuthContext.Provider>

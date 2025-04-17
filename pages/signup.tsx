@@ -23,7 +23,7 @@ const SignUp: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { isStudentAuthenticated, setIsStudentAuthenticated, setStudent } = useStudentAuth();
+  const { isStudentAuthenticated, setIsStudentAuthenticated, setStudent, setToken } = useStudentAuth();
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -89,26 +89,34 @@ const SignUp: React.FC = () => {
       
       const response = await studentApi.register(registrationData as StudentRegistrationData);
 
-      setSuccess('Account created successfully! Redirecting to dashboard...');
+      setSuccess('Account created successfully! Redirecting to semester selection...');
       
-      // Store the JWT token in localStorage
+      // Store the JWT token
       if (response.token) {
         localStorage.setItem('studentToken', response.token);
+        setToken(response.token);
       }
       
-      // Set authentication state with the semester property set to null for new students
-      setIsStudentAuthenticated(true);
-      setStudent({
-        ...response.student,
-        semester: null // New students start with null semester until they select one
-      });
+      // Store the complete student data
+      if (response.student) {
+        setStudent(response.student);
+      }
       
-      // Redirect after a short delay
+      // Set authentication state
+      setIsStudentAuthenticated(true);
+      
+      // All new accounts need to select a semester
       setTimeout(() => {
-        router.push('/dashboard');
-      }, 2000);
+        router.push('/select-semester');
+      }, 1500);
     } catch (err: any) {
-      setError(err.message || 'An error occurred during signup');
+      // Check for specific error messages
+      if (err.message?.includes('already exists')) {
+        setError('A student with this roll number already exists. Please log in instead.');
+      } else {
+        setError(err.message || 'Failed to create account. Please try again.');
+      }
+      console.error('Registration error:', err);
     } finally {
       setIsLoading(false);
     }

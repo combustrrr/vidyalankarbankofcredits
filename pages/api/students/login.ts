@@ -49,7 +49,7 @@ export default async function handler(
     // Find the student with the provided roll number
     const { data: student, error } = await supabase
       .from('students')
-      .select('id, roll_number, password_hash, first_name, last_name, full_name, division, degree, branch')
+      .select('id, roll_number, password_hash, first_name, last_name, full_name, legal_name, division, degree, branch, semester, created_at, updated_at')
       .eq('roll_number', roll_number)
       .single();
 

@@ -39,15 +39,17 @@ const Login: React.FC = () => {
         throw new Error('Invalid response from server');
       }
 
-      // First set the student data and token
-      setStudent(response.student);
+      // First store the token
       setToken(response.token);
       
-      // Then set authentication state
+      // Then store the complete student data including ID and semester status
+      setStudent(response.student);
+      
+      // Set authentication state
       setIsStudentAuthenticated(true);
       
-      // Determine redirect based on whether semester is set
-      if (response.student.semester === null) {
+      // Check if semester is null and redirect to select-semester
+      if (response.student.semester === null || response.student.semester === undefined) {
         router.push('/select-semester');
       } else {
         router.push('/dashboard');

@@ -349,6 +349,45 @@ const migrationTasks = {
       console.log('✅ Basket credits view already exists.');
       return true;
     }
+  },
+
+  async createSemesterProtectionPolicy() {
+    console.log('🔒 Setting up semester protection policy...');
+    
+    // Check if the policy exists by trying to query a test value with the admin setting
+    try {
+      // Try to set a test value (non-destructive operation) to see if the policy is in place
+      const { error } = await supabase.rpc('get_setting', { name: 'app.is_admin' });
+      
+      if (error && error.message.includes('function get_setting does not exist')) {
+        // Policy might not be in place, create it
+        return executeSqlFileOrPrompt(path.join(__dirname, '../create-semester-protection-policy.sql'), 'semester protection policy');
+      } else {
+        console.log('✅ Semester protection policy appears to be in place.');
+        return true;
+      }
+    } catch (err) {
+      console.log('⚠️ Could not verify policy status, will attempt to create it.');
+      return executeSqlFileOrPrompt(path.join(__dirname, '../create-semester-protection-policy.sql'), 'semester protection policy');
+    }
+  },
+  
+  async createCompletedCoursesTable() {
+    console.log('📊 Setting up completed_courses table...');
+    
+    // Check if the table exists
+    const { data: existingTable, error: tableCheckError } = await supabase
+      .from('completed_courses')
+      .select('id')
+      .limit(1);
+    
+    if (tableCheckError) {
+      // Table doesn't exist, create it
+      return executeSqlFileOrPrompt(path.join(__dirname, '../create-completed-courses-table.sql'), 'completed_courses');
+    } else {
+      console.log('✅ Completed courses table already exists.');
+      return true;
+    }
   }
 };
 
@@ -393,6 +432,20 @@ async function runMigrations({ interactive = true, forceContinue = false } = {})
       tasksSucceeded++;
     } else if (!forceContinue) {
       throw new Error('Failed to create basket credits view');
+    }
+    
+    // Create semester protection policy
+    if (await migrationTasks.createSemesterProtectionPolicy() || forceContinue) {
+      tasksSucceeded++;
+    } else if (!forceContinue) {
+      throw new Error('Failed to create semester protection policy');
+    }
+    
+    // Create completed courses table
+    if (await migrationTasks.createCompletedCoursesTable() || forceContinue) {
+      tasksSucceeded++;
+    } else if (!forceContinue) {
+      throw new Error('Failed to create completed courses table');
     }
     
     console.log(`✅ Migration completed: ${tasksSucceeded}/${totalTasks} tasks successful.`);
