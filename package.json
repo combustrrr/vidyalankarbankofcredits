@@ -1,7 +1,9 @@
 {
-  "name": "vidyalankar-credits-clean",
-  "version": "2.0.0",
-  "description": "Clean Vidyalankar Bank of Credits system with Next.js and Supabase",
+  "name": "credits-management-system",
+  "version": "1.0.0",
+  "description": "A comprehensive credit management system with RBAC for educational institutions",
+  "author": "Sarthak Kulkarni <icsarthak9@gmail.com>",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -36,5 +38,22 @@
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3",
     "typescript": "^5.2.2"
-  }
+  },
+  "keywords": [
+    "nextjs",
+    "typescript",
+    "supabase",
+    "rbac",
+    "education",
+    "student-management",
+    "credit-system",
+    "academic",
+    "postgresql",
+    "tailwindcss"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/credits-management-system.git"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/credits-management-system#readme"
 }
